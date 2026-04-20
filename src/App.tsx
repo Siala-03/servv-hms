@@ -21,6 +21,7 @@ import { Housekeeping }   from './pages/Housekeeping';
 import { Reports }        from './pages/Reports';
 import { SuperAdminPage } from './pages/SuperAdminPage';
 import { UsersPage }      from './pages/UsersPage';
+import { Intelligence }   from './pages/Intelligence';
 
 function Unauthorized() {
   return (
@@ -70,6 +71,7 @@ export function App() {
               <Route path="orders"        element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="housekeeping"  element={<ProtectedRoute><Housekeeping /></ProtectedRoute>} />
               <Route path="reports"       element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="intelligence"  element={<ProtectedRoute><Intelligence /></ProtectedRoute>} />
               <Route path="users"         element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
             </Route>
 

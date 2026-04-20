@@ -1,6 +1,7 @@
-import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { ServvIQ } from './ServvIQ';
+
 export function Layout() {
   return (
     <div className="relative flex min-h-screen bg-transparent">
@@ -10,6 +11,7 @@ export function Layout() {
           <Outlet />
         </div>
       </main>
-    </div>);
-
+      <ServvIQ />
+    </div>
+  );
 }

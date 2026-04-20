@@ -19,6 +19,7 @@ export const ROUTE_ROLES: Record<string, UserRole[]> = {
   '/orders':       ['superadmin', 'manager', 'front_desk', 'fnb'],
   '/housekeeping': ['superadmin', 'manager', 'housekeeping'],
   '/reports':      ['superadmin', 'manager'],
+  '/intelligence': ['superadmin', 'manager'],
   '/users':        ['superadmin', 'manager'],
   '/superadmin':   ['superadmin'],
 };

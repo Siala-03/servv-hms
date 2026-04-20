@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, Network, ConciergeBell,
   Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3,
-  LogOut, ShieldCheck, UserCog,
+  LogOut, ShieldCheck, UserCog, Brain,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, UserRole, canAccess } from '../lib/rbac';
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { name: 'Housekeeping',    path: '/housekeeping', icon: Sparkles        },
   { name: 'Staff',           path: '/staff',        icon: UserCircle      },
   { name: 'Reports',         path: '/reports',      icon: BarChart3       },
+  { name: 'Intelligence',   path: '/intelligence', icon: Brain           },
   { name: 'User Accounts',   path: '/users',        icon: UserCog         },
   { name: 'Hotels',          path: '/superadmin',   icon: ShieldCheck     },
 ];
