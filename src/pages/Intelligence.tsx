@@ -93,7 +93,7 @@ export function Intelligence() {
       const data = await api.post<AiResponse>('/api/intelligence/insights', {});
       setAi(data);
     } catch (e: any) {
-      setAiError(e.message ?? 'Failed to generate insights. Check your GEMINI_API_KEY.');
+      setAiError(e.message ?? 'Failed to generate Servv Insights. Check your SERVV_INSIGHTS_API_KEY.');
     } finally { setLoadingAi(false); }
   }
 
@@ -112,7 +112,7 @@ export function Intelligence() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <PageHeader
         title="Intelligence"
-        subtitle="AI-powered demand forecasting, smart pricing, and Gemini insights."
+        subtitle="AI-powered demand forecasting, smart pricing, and Servv Insights."
         actions={
           <button
             onClick={fetchInsights}
@@ -120,7 +120,7 @@ export function Intelligence() {
             className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm disabled:opacity-50"
           >
             {loadingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-            {loadingAi ? 'Analysing…' : ai ? 'Refresh Insights' : 'Generate AI Insights'}
+            {loadingAi ? 'Analysing…' : ai ? 'Refresh Servv Insights' : 'Generate Servv Insights'}
           </button>
         }
       />
@@ -259,7 +259,7 @@ export function Intelligence() {
               <Brain className="w-4 h-4 text-purple-600" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Gemini AI Insights</h3>
+              <h3 className="text-base font-semibold text-slate-900">Servv Insights</h3>
               <p className="text-xs text-slate-400">Personalized recommendations from your live hotel data</p>
             </div>
           </div>
@@ -272,13 +272,13 @@ export function Intelligence() {
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800 mb-1">Ready to analyse your data</p>
-                  <p className="text-sm text-slate-400 max-w-xs">Click "Generate AI Insights" to get Gemini's personalised recommendations based on your current bookings and revenue.</p>
+                  <p className="text-sm text-slate-400 max-w-xs">Click "Generate Servv Insights" to get personalized recommendations based on your current bookings and revenue.</p>
                 </div>
                 <button
                   onClick={fetchInsights}
                   className="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
                 >
-                  <Brain className="w-4 h-4" /> Generate AI Insights
+                  <Brain className="w-4 h-4" /> Generate Servv Insights
                 </button>
               </div>
             )}
@@ -286,7 +286,7 @@ export function Intelligence() {
             {loadingAi && (
               <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-400 py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-                <p className="text-sm">Gemini is analysing your hotel data…</p>
+                <p className="text-sm">Servv Insights is analysing your hotel data…</p>
               </div>
             )}
 
@@ -331,7 +331,7 @@ export function Intelligence() {
                 })}
 
                 <p className="text-xs text-slate-400 text-right">
-                  Generated {new Date(ai.generatedAt).toLocaleTimeString()} · Powered by Gemini
+                  Generated {new Date(ai.generatedAt).toLocaleTimeString()} · Powered by Servv Insights
                 </p>
               </div>
             )}

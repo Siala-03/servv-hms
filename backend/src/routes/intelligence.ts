@@ -5,6 +5,130 @@ import { authenticate, AuthRequest } from '../middleware/authenticate';
 const router = Router();
 router.use(authenticate);
 
+function getServvInsightsApiKey() {
+  return process.env.SERVV_INSIGHTS_API_KEY ?? process.env.GEMINI_API_KEY;
+}
+
+function isTruthyEnv(value: string | undefined) {
+  if (!value) return false;
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+function isExternalMarketQuestion(message: string) {
+  const q = message.toLowerCase();
+  const externalSignals = [
+    'rwanda',
+    'market',
+    'industry',
+    'country',
+    'city',
+    'tourism',
+    'season',
+    'high season',
+    'low season',
+    'this year',
+    'next year',
+    'trend',
+    'macro',
+    'forecast',
+    'google',
+    'search',
+    'competitor',
+    'events',
+    'conference',
+    'festival',
+    'weather',
+  ];
+
+  return externalSignals.some((signal) => q.includes(signal));
+}
+
+interface SnapshotSummary {
+  totalRevenue: string;
+  totalBookings: number;
+  adr: string;
+  occupancy: string;
+  topChannels: string;
+  arrivingNext7Days: number;
+  openHousekeepingTasks: number;
+  totalRooms: number;
+}
+
+function buildRuleBasedInsights(summary: SnapshotSummary) {
+  const occupancyValue = Number.parseInt(summary.occupancy.replace('%', ''), 10) || 0;
+
+  const insights = [
+    {
+      category: 'Revenue',
+      title: 'Protect rate on high-need nights',
+      body: `ADR is ${summary.adr} with ${summary.totalBookings} bookings in the period. Keep rates firm on high-demand nights and reserve only targeted discounts for low pickup days.`,
+      priority: occupancyValue >= 70 ? 'high' : 'medium',
+    },
+    {
+      category: 'Operations',
+      title: 'Balance arrivals and room readiness',
+      body: `${summary.arrivingNext7Days} confirmed arrivals are coming in the next 7 days. Pre-assign rooms and align housekeeping sequences to reduce front-desk waiting during peak check-in windows.`,
+      priority: summary.arrivingNext7Days >= 8 ? 'high' : 'medium',
+    },
+    {
+      category: 'Guest Experience',
+      title: 'Use channel source for personalization',
+      body: `Top channels are ${summary.topChannels || 'not yet distributed'}. Tailor welcome messages and upsell offers by source to increase conversion and post-stay satisfaction.`,
+      priority: 'medium',
+    },
+    {
+      category: 'Action Today',
+      title: 'Clear operational blockers first',
+      body: `${summary.openHousekeepingTasks} open housekeeping tasks are pending. Close urgent tasks before arrival peaks to protect check-in speed and guest first impressions.`,
+      priority: summary.openHousekeepingTasks > 0 ? 'high' : 'low',
+    },
+  ] as const;
+
+  return {
+    insights,
+    summary: `Current occupancy is ${summary.occupancy} across ${summary.totalRooms} rooms, with ${summary.arrivingNext7Days} arrivals expected next week.`,
+  };
+}
+
+function buildServvIqFallbackReply(
+  message: string,
+  snapshot: {
+    occupancy: number;
+    revenue7d: number;
+    arrivals7d: number;
+    urgentTasks: number;
+    openTasks: number;
+    channels: Record<string, number>;
+  },
+) {
+  const q = message.toLowerCase();
+  const topChannel = Object.entries(snapshot.channels).sort((a, b) => b[1] - a[1])[0];
+
+  if (q.includes('occupancy')) {
+    return `Current occupancy is ${snapshot.occupancy}%. Prioritize premium room upsells if occupancy is above 70%, and run targeted demand stimulation if below 50%.`;
+  }
+  if (q.includes('revenue') || q.includes('adr') || q.includes('money')) {
+    return `Revenue in the last 7 days is $${snapshot.revenue7d.toLocaleString()}. Focus today on add-ons and premium upgrades to lift ADR without broad discounting.`;
+  }
+  if (q.includes('channel')) {
+    return topChannel
+      ? `Top booking channel in recent activity is ${topChannel[0]} (${topChannel[1]} bookings). Consider inventory protection and parity checks there first.`
+      : 'No strong channel pattern yet. Keep direct channel offers visible and monitor conversion daily.';
+  }
+  if (q.includes('housekeeping') || q.includes('task')) {
+    return `There are ${snapshot.openTasks} open housekeeping tasks (${snapshot.urgentTasks} urgent). Clear urgent rooms first, then sequence by nearest arrivals.`;
+  }
+  if (q.includes('focus') || q.includes('today') || q.includes('priority')) {
+    return `Today's priorities: 1) prepare for ${snapshot.arrivals7d} upcoming arrivals, 2) resolve ${snapshot.urgentTasks} urgent housekeeping tasks, 3) protect pricing where occupancy is strongest.`;
+  }
+
+  return `Here is your current snapshot: occupancy ${snapshot.occupancy}%, revenue last 7 days $${snapshot.revenue7d.toLocaleString()}, arrivals next 7 days ${snapshot.arrivals7d}, urgent housekeeping tasks ${snapshot.urgentTasks}. Ask about occupancy, pricing, channels, or operations for specific guidance.`;
+}
+
+function buildExternalQuestionFallback() {
+  return 'I can answer this with web-grounded market context when Servv Insights cloud mode is enabled. Ask your admin to set SERVV_INSIGHTS_API_KEY and SERVV_IQ_WEB_SEARCH=true in backend environment variables, then try again.';
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function isoDate(d: Date) {
@@ -135,11 +259,10 @@ router.get('/pricing', async (req: AuthRequest, res, next) => {
 });
 
 // ── POST /api/intelligence/insights ──────────────────────────────────────────
-// Bundles hotel KPIs and sends to Gemini for AI narrative insights.
+// Bundles hotel KPIs and sends to Servv Insights provider when configured.
 router.post('/insights', async (req: AuthRequest, res, next) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const apiKey = getServvInsightsApiKey();
 
     const hotelId  = req.hotelId;
     const today    = new Date();
@@ -217,7 +340,12 @@ Based on this data, provide exactly 4 concise, actionable insights in JSON forma
 
 Be specific, use the actual numbers, and focus on what the hotel can act on RIGHT NOW. Keep each body under 60 words.`;
 
-    const geminiRes = await fetch(
+    if (!apiKey) {
+      const fallback = buildRuleBasedInsights(summary);
+      return res.json({ ...fallback, kpis: summary, generatedAt: new Date().toISOString(), provider: 'servv-rules' });
+    }
+
+    const modelRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method:  'POST',
@@ -229,28 +357,32 @@ Be specific, use the actual numbers, and focus on what the hotel can act on RIGH
       },
     );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return res.status(502).json({ error: `Gemini error: ${errText}` });
+    if (!modelRes.ok) {
+      const fallback = buildRuleBasedInsights(summary);
+      return res.json({ ...fallback, kpis: summary, generatedAt: new Date().toISOString(), provider: 'servv-rules' });
     }
 
-    const geminiData = await geminiRes.json() as any;
-    const rawText    = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+    const modelData = await modelRes.json() as any;
+    const rawText   = modelData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
 
     let parsed: any;
-    try { parsed = JSON.parse(rawText); }
-    catch { return res.status(502).json({ error: 'Gemini returned invalid JSON', raw: rawText }); }
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const fallback = buildRuleBasedInsights(summary);
+      return res.json({ ...fallback, kpis: summary, generatedAt: new Date().toISOString(), provider: 'servv-rules' });
+    }
 
-    res.json({ ...parsed, kpis: summary, generatedAt: new Date().toISOString() });
+    res.json({ ...parsed, kpis: summary, generatedAt: new Date().toISOString(), provider: 'servv-cloud' });
   } catch (err) { next(err); }
 });
 
 // ── POST /api/intelligence/chat ──────────────────────────────────────────────
-// Servv IQ — context-aware hotel assistant powered by Gemini.
+// Servv IQ — context-aware hotel assistant powered by Servv Insights provider.
 router.post('/chat', async (req: AuthRequest, res, next) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const apiKey = getServvInsightsApiKey();
+    const webSearchEnabled = isTruthyEnv(process.env.SERVV_IQ_WEB_SEARCH);
 
     const { message, history = [] } = req.body as {
       message: string;
@@ -298,8 +430,10 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
     const context = `
 You are Servv IQ, an expert AI hotel management assistant embedded inside Servv HMS.
 You are speaking with the hotel manager. Be concise, professional, and specific.
-Always base your answers on the live hotel data below. Use $ for currency, % for rates.
-Never make up data — if something isn't in the context, say so.
+  Primary mode: base answers on the live hotel data below. Use $ for currency, % for rates.
+  For external market questions (seasonality, destination trends, tourism demand, events), use grounded web search when available.
+  When using external context, clearly label it as External Market Context and connect it to concrete hotel actions.
+  Never make up data. If a source or data point is unavailable, say so.
 
 LIVE HOTEL SNAPSHOT (as of ${todayIso}):
 - Rooms: ${totalRooms} total, ${occupied} occupied, ${occupancy}% occupancy
@@ -311,7 +445,27 @@ LIVE HOTEL SNAPSHOT (as of ${todayIso}):
 - Today: ${todayIso}
 `.trim();
 
-    // ── build Gemini contents array ──────────────────────────
+  const asksExternalMarketContext = isExternalMarketQuestion(message);
+  const shouldUseWebSearch = Boolean(apiKey) && webSearchEnabled && asksExternalMarketContext;
+
+    const fallbackReply = buildServvIqFallbackReply(message, {
+      occupancy,
+      revenue7d,
+      arrivals7d,
+      urgentTasks,
+      openTasks: (openTasks ?? []).length,
+      channels,
+    });
+
+    if (!apiKey && asksExternalMarketContext) {
+      return res.json({ reply: buildExternalQuestionFallback(), provider: 'servv-rules' });
+    }
+
+    if (!apiKey) {
+      return res.json({ reply: fallbackReply, provider: 'servv-rules' });
+    }
+
+    // ── build provider contents array ──────────────────────────
     const contents = [
       // Inject context as first user turn + model ack
       { role: 'user',  parts: [{ text: context }] },
@@ -322,27 +476,40 @@ LIVE HOTEL SNAPSHOT (as of ${todayIso}):
       { role: 'user', parts: [{ text: message.trim() }] },
     ];
 
-    const geminiRes = await fetch(
+    const requestBody: Record<string, unknown> = {
+      contents,
+      generationConfig: { temperature: 0.5, maxOutputTokens: 512 },
+    };
+
+    if (shouldUseWebSearch) {
+      requestBody.tools = [{ google_search: {} }];
+    }
+
+    const modelRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: { temperature: 0.5, maxOutputTokens: 512 },
-        }),
+        body: JSON.stringify(requestBody),
       },
     );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return res.status(502).json({ error: `Gemini error: ${errText}` });
+    if (!modelRes.ok) {
+      if (asksExternalMarketContext) {
+        return res.json({ reply: buildExternalQuestionFallback(), provider: 'servv-rules' });
+      }
+      return res.json({ reply: fallbackReply, provider: 'servv-rules' });
     }
 
-    const data    = await geminiRes.json() as any;
-    const reply   = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sorry, I could not generate a response.';
+    const data    = await modelRes.json() as any;
+    let reply     = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sorry, I could not generate a response.';
+    const grounded = Boolean(data?.candidates?.[0]?.groundingMetadata);
 
-    res.json({ reply });
+    if (asksExternalMarketContext && !grounded && shouldUseWebSearch) {
+      reply += '\n\nNote: grounded web sources were unavailable for this answer. Treat this as directional and validate with recent market reports.';
+    }
+
+    res.json({ reply, provider: shouldUseWebSearch ? 'servv-cloud+web' : 'servv-cloud' });
   } catch (err) { next(err); }
 });
 
