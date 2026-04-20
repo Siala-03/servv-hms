@@ -412,7 +412,7 @@ export function Reservations() {
               <select value={formData.roomId} onChange={(e) => setFormData({ ...formData, roomId: e.target.value })} className={inputCls}>
                 <option value="">Select room…</option>
                 {rooms.filter((r) => r.status === 'Available').map((r) => (
-                  <option key={r.id} value={r.id}>Room {r.roomNumber} – {r.roomType} (RWF {r.baseRate.toLocaleString()}/night)</option>
+                  <option key={r.id} value={r.id}>Room {r.roomNumber} – {r.roomType} (${r.baseRate}/night)</option>
                 ))}
               </select>
             ), true)}
@@ -440,8 +440,8 @@ export function Reservations() {
               <input type="number" min={0} max={10} value={formData.children} placeholder="0" onChange={(e) => setFormData({ ...formData, children: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
             ))}
             <div className="sm:col-span-2">
-              {field('Total Amount (RWF)', (
-                <input type="number" min={0} step="1" value={formData.totalAmount} placeholder="0" onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
+              {field('Total Amount (USD)', (
+                <input type="number" min={0} step="0.01" value={formData.totalAmount} placeholder="0.00" onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
               ))}
             </div>
           </div>

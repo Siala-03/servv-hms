@@ -236,8 +236,8 @@ export function BookingPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-slate-900 text-lg">RWF {room.totalPrice.toLocaleString()}</p>
-                        <p className="text-xs text-slate-400">RWF {room.baseRate.toLocaleString()}/night · {avail.nights} nights</p>
+                        <p className="font-bold text-slate-900 text-lg">${room.totalPrice}</p>
+                        <p className="text-xs text-slate-400">${room.baseRate}/night · {avail.nights} nights</p>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">

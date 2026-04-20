@@ -243,7 +243,7 @@ function ReservationCard({ res }: { res: Reservation }) {
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
         <span className="text-xs text-slate-500">{res.ratePlan.name} · {res.ratePlan.mealPlan}</span>
         <span className="font-bold text-slate-900 text-sm">
-          RWF {Number(res.totalAmount).toLocaleString()}
+          {res.currency} {Number(res.totalAmount).toFixed(2)}
         </span>
       </div>
     </div>
