@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { UserRole, ROLE_HOME } from '../lib/rbac';
-
-const API = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:4000';
+import { api } from '../lib/api';
 
 export interface AuthUser {
   id:            string;
@@ -37,22 +36,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedId = localStorage.getItem('servv_user_id');
     if (!storedId) { setLoading(false); return; }
 
-    fetch(`${API}/api/auth/me`, { headers: { 'x-user-id': storedId } })
-      .then((r) => r.ok ? r.json() : Promise.reject())
+    api.get<{ user: AuthUser }>('/api/auth/me')
       .then(({ user: u }) => setUser(u))
       .catch(() => { localStorage.removeItem('servv_user_id'); })
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (username: string, password: string, hotelId?: string) => {
-    const res = await fetch(`${API}/api/auth/login`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ username, password, hotelId: hotelId || undefined }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? 'Login failed');
+    const data = await api.post<{ user: AuthUser }>(
+      '/api/auth/login',
+      { username, password, hotelId: hotelId || undefined },
+      'Login',
+    );
 
     localStorage.setItem('servv_user_id', data.user.id);
     setUser(data.user);
