@@ -22,9 +22,26 @@ import { errorHandler, notFound }    from './middleware/errorHandler';
 
 const app        = express();
 const PORT       = Number(process.env.PORT ?? 4000);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const rawCorsOrigins = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const allowedOrigins = rawCorsOrigins
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow non-browser requests (no Origin header), e.g. curl/postman/health checks.
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+}));
 app.use(express.json());
 
 // ── Public paths (no auth required) ──────────────────────────────────────────
