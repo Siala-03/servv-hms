@@ -10,7 +10,7 @@ import { ROLE_LABELS, UserRole, canAccess } from '../lib/rbac';
 import { BrandLogo } from './BrandLogo';
 
 const NAV_ITEMS = [
-  { name: 'Dashboard',       path: '/',             icon: LayoutDashboard },
+  { name: 'Dashboard',       path: '/dashboard',    icon: LayoutDashboard },
   { name: 'Reservations',    path: '/reservations', icon: CalendarDays    },
   { name: 'Channel Manager', path: '/channels',     icon: Network         },
   { name: 'Front Desk',      path: '/front-desk',   icon: ConciergeBell   },
@@ -68,7 +68,7 @@ export function Sidebar() {
             <NavLink
               key={item.name}
               to={item.path}
-              end={item.path === '/'}
+              end={item.path === '/dashboard'}
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                   isActive

@@ -22,7 +22,8 @@ export function LoginPage() {
   useEffect(() => {
     if (user) {
       const from = (location.state as any)?.from?.pathname;
-      navigate(from ?? ROLE_HOME[user.role], { replace: true });
+      const safeFrom = from && from !== '/' ? from : null;
+      navigate(safeFrom ?? ROLE_HOME[user.role], { replace: true });
     }
   }, [user]);
 

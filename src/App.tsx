@@ -62,7 +62,8 @@ export function App() {
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route index                element={<Dashboard />} />
+              <Route index                element={<Navigate to="/login" replace />} />
+              <Route path="dashboard"    element={<Dashboard />} />
               <Route path="reservations"  element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
               <Route path="channels"      element={<ProtectedRoute><ChannelManager /></ProtectedRoute>} />
               <Route path="front-desk"    element={<ProtectedRoute><FrontDesk /></ProtectedRoute>} />
@@ -75,7 +76,7 @@ export function App() {
               <Route path="users"         element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>

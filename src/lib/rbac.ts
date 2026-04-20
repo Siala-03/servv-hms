@@ -10,6 +10,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 // Which roles can access each route
 export const ROUTE_ROLES: Record<string, UserRole[]> = {
+  '/dashboard':    ['superadmin', 'manager', 'front_desk', 'housekeeping', 'fnb'],
   '/':             ['superadmin', 'manager', 'front_desk', 'housekeeping', 'fnb'],
   '/reservations': ['superadmin', 'manager', 'front_desk'],
   '/channels':     ['superadmin', 'manager'],
@@ -33,7 +34,7 @@ export function canAccess(role: UserRole | undefined, path: string): boolean {
 // Where to land after login
 export const ROLE_HOME: Record<UserRole, string> = {
   superadmin:   '/superadmin',
-  manager:      '/',
+  manager:      '/dashboard',
   front_desk:   '/front-desk',
   housekeeping: '/housekeeping',
   fnb:          '/orders',
