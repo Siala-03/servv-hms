@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Hotel, Users, Utensils, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
+import { API_BASE } from '../lib/api';
 
-const API = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:4000';
+const API = API_BASE;
 
 function authHeaders() {
   const id = localStorage.getItem('servv_user_id');

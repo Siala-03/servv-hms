@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Hotel, CheckCircle2, AlertCircle, Loader2, Calendar, Users, BedDouble } from 'lucide-react';
+import { API_BASE } from '../lib/api';
 
-const API = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:4000';
+const API = API_BASE;
 
 type Step = 'loading' | 'form' | 'submitting' | 'success' | 'error';
 

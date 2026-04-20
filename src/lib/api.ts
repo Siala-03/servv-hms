@@ -1,7 +1,34 @@
 // Thin fetch wrapper with offline-queue fallback for mutations.
 
-const BASE = (import.meta as Record<string, unknown> & { env: Record<string, string> }).env
-  .VITE_API_URL ?? 'http://localhost:4000';
+function normalizeApiBase(rawValue?: string): string {
+  let value = (rawValue ?? '').trim();
+  if (!value) return 'http://localhost:4000';
+
+  // Handle common misconfiguration where the full assignment is pasted as the value.
+  if (value.startsWith('VITE_API_URL=')) {
+    value = value.slice('VITE_API_URL='.length).trim();
+  }
+
+  // Remove wrapping quotes if present.
+  value = value.replace(/^['\"]|['\"]$/g, '');
+
+  // Repair malformed scheme (https:/example.com -> https://example.com).
+  value = value.replace(/^https:\/(?!\/)/i, 'https://');
+  value = value.replace(/^http:\/(?!\/)/i, 'http://');
+
+  if (!/^https?:\/\//i.test(value)) {
+    console.warn(`Invalid VITE_API_URL "${value}". Falling back to http://localhost:4000`);
+    return 'http://localhost:4000';
+  }
+
+  return value.replace(/\/+$/, '');
+}
+
+export const API_BASE = normalizeApiBase(
+  (import.meta as Record<string, unknown> & { env: Record<string, string> }).env.VITE_API_URL,
+);
+
+const BASE = API_BASE;
 
 // Lazy-imported so the queue module is only loaded in the browser
 let queueModule: typeof import('./offlineQueue') | null = null;

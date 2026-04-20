@@ -5,8 +5,9 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, UserRole } from '../lib/rbac';
+import { API_BASE } from '../lib/api';
 
-const API = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:4000';
+const API = API_BASE;
 
 function authHeaders() {
   const id = localStorage.getItem('servv_user_id');
