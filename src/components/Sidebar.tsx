@@ -50,15 +50,13 @@ export function Sidebar() {
   return (
     <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
 
-      <div className="relative p-6 pb-4 flex items-center gap-3 border-b border-slate-800/80">
-        <div className="w-24 sm:w-28 shrink-0 flex items-center">
-          <BrandLogo variant="light" className="h-7 sm:h-8" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <span className="text-white font-bold text-base sm:text-lg tracking-tight block truncate leading-tight">
+      <div className="relative px-6 pt-6 pb-4 flex flex-col items-start gap-3 border-b border-slate-800/80">
+        <BrandLogo variant="light" className="h-7" />
+        <div className="w-full">
+          <span className="text-white font-semibold text-sm leading-snug block break-words">
             {user?.hotelName ?? 'SERVV HMS'}
           </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-slate-400 truncate block mt-0.5">Servv HMS</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-slate-500 block mt-0.5">Property</span>
         </div>
       </div>
 
