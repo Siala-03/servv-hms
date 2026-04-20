@@ -63,7 +63,7 @@ function fmtDay(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const usd = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const rwf = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 });
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -228,14 +228,14 @@ export function Intelligence() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-base font-bold text-slate-900">{usd.format(p.recommended)}</span>
+                      <span className="text-base font-bold text-slate-900">{rwf.format(p.recommended)}</span>
                       <span className={`ml-1.5 text-xs font-medium ${p.change > 0 ? 'text-emerald-600' : p.change < 0 ? 'text-red-500' : 'text-slate-400'}`}>
                         {p.change > 0 ? `+${p.change}%` : p.change < 0 ? `${p.change}%` : 'No change'}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-slate-400">Base: {usd.format(p.baseRate)} · 7-day occ: {p.occupancy7d}%</span>
+                    <span className="text-xs text-slate-400">Base: {rwf.format(p.baseRate)} · 7-day occ: {p.occupancy7d}%</span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-1.5 mb-2">
                     <div className={`h-1.5 rounded-full transition-all ${

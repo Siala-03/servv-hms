@@ -32,11 +32,11 @@ interface NewOrderForm {
   requestedByGuestId: string;
   department: string;
   itemsRaw: string;
-  amount: number;
+  amount: number | '';
 }
 
 const emptyForm = (): NewOrderForm => ({
-  reservationId: '', requestedByGuestId: '', department: 'Room Service', itemsRaw: '', amount: 0,
+  reservationId: '', requestedByGuestId: '', department: 'Room Service', itemsRaw: '', amount: '',
 });
 
 function timeAgo(iso: string) {
@@ -97,8 +97,8 @@ export function Orders() {
         department:          form.department as 'Kitchen' | 'Room Service' | 'Laundry',
         items:               form.itemsRaw.split('\n').map((s) => s.trim()).filter(Boolean),
         status:              'New',
-        amount:              form.amount,
-        currency:            'USD',
+        amount:              Number(form.amount) || 0,
+        currency:            'RWF',
       });
       setShowNew(false);
       setForm(emptyForm());
@@ -207,8 +207,8 @@ export function Orders() {
               <textarea rows={3} value={form.itemsRaw} onChange={(e) => setForm({ ...form, itemsRaw: e.target.value })} placeholder={"Club Sandwich\nSparkling Water"} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Amount (USD)</label>
-              <input type="number" min={0} step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} className={inputCls} />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Amount (RWF)</label>
+              <input type="number" min={0} step="1" value={form.amount} placeholder="0" onChange={(e) => setForm({ ...form, amount: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
             </div>
           </div>
         </Modal>
@@ -238,7 +238,7 @@ function OrderCard({ order, onStatusChange }: { order: OrderRow; onStatusChange:
         {order.items.map((item, i) => <li key={i} className="flex items-start gap-2"><span className="text-gray-400 mt-1">•</span>{item}</li>)}
       </ul>
       <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-        <span className="font-semibold text-gray-900">${order.amount.toFixed(2)}</span>
+        <span className="font-semibold text-gray-900">RWF {order.amount.toLocaleString()}</span>
         {order.status === 'New' && (
           <button onClick={() => onStatusChange(order.id, 'Preparing')} className="px-3 py-1 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded text-xs font-medium transition-colors">
             Accept

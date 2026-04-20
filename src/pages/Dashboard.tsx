@@ -23,7 +23,7 @@ interface ApiRes {
 interface ApiRoom { id: string; status: string; }
 interface ApiTask { id: string; status: string; notes?: string; room?: { roomNumber: string } | null; createdAt: string; }
 
-const usd = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const rwf = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 });
 
 function isoToday() { return new Date().toISOString().split('T')[0]; }
 
@@ -151,8 +151,8 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard title="Occupancy Rate"       value={loading ? '—' : `${occupancy}%`}        icon={BedDouble}    color="amber" />
-        <StatsCard title="Revenue (Checked-in)" value={loading ? '—' : usd.format(todayRevenue)} icon={Banknote}    color="emerald" />
-        <StatsCard title="Average Daily Rate"   value={loading ? '—' : usd.format(adr)}          icon={TrendingUp}   color="purple" />
+        <StatsCard title="Revenue (Checked-in)" value={loading ? '—' : rwf.format(todayRevenue)} icon={Banknote}    color="emerald" />
+        <StatsCard title="Average Daily Rate"   value={loading ? '—' : rwf.format(adr)}          icon={TrendingUp}   color="purple" />
         <StatsCard title="Pending Check-ins"    value={loading ? '—' : String(pendingCI)}         icon={CalendarCheck} color="amber" />
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, TrendingUp, DollarSign, Users, Calendar } from 'lucide-react';
+import { Download, TrendingUp, Banknote, Users, Calendar } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line,
@@ -29,7 +29,7 @@ function startOf(range: Range): Date {
   return new Date(now.getFullYear(), 0, 1);
 }
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const rwf = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 });
 
 export function Reports() {
   const [reservations, setReservations] = useState<ApiRes[]>([]);
@@ -123,8 +123,8 @@ export function Reports() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatsCard title="Total Revenue"  value={loading ? '—' : usd.format(totalRevenue)} icon={DollarSign} color="emerald" />
-        <StatsCard title="ADR"            value={loading ? '—' : usd.format(adr)}           icon={TrendingUp} color="amber" />
+        <StatsCard title="Total Revenue"  value={loading ? '—' : rwf.format(totalRevenue)} icon={Banknote}   color="emerald" />
+        <StatsCard title="ADR"            value={loading ? '—' : rwf.format(adr)}           icon={TrendingUp} color="amber" />
         <StatsCard title="Total Bookings" value={loading ? '—' : String(filtered.length)}   icon={Calendar}   color="purple" />
         <StatsCard title="Total Guests"   value={loading ? '—' : String(totalGuests)}        icon={Users}      color="amber" />
       </div>
@@ -199,9 +199,9 @@ export function Reports() {
                 <tr key={ch.name} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900">{ch.name}</td>
                   <td className="px-6 py-4 text-gray-600">{ch.bookings}</td>
-                  <td className="px-6 py-4 font-medium text-emerald-600">{usd.format(ch.revenue)}</td>
-                  <td className="px-6 py-4 text-red-500">{usd.format(ch.commission)}</td>
-                  <td className="px-6 py-4 font-medium text-gray-900">{usd.format(ch.revenue - ch.commission)}</td>
+                  <td className="px-6 py-4 font-medium text-emerald-600">{rwf.format(ch.revenue)}</td>
+                  <td className="px-6 py-4 text-red-500">{rwf.format(ch.commission)}</td>
+                  <td className="px-6 py-4 font-medium text-gray-900">{rwf.format(ch.revenue - ch.commission)}</td>
                 </tr>
               ))}
             </tbody>

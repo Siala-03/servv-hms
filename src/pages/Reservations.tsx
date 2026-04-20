@@ -26,14 +26,14 @@ interface BookingForm {
   channel: string;
   checkInDate: string;
   checkOutDate: string;
-  adults: number;
-  children: number;
-  totalAmount: number;
+  adults: number | '';
+  children: number | '';
+  totalAmount: number | '';
 }
 
 const emptyForm = (): BookingForm => ({
   guestId: '', roomId: '', ratePlanId: '', channel: 'Direct',
-  checkInDate: '', checkOutDate: '', adults: 1, children: 0, totalAmount: 0,
+  checkInDate: '', checkOutDate: '', adults: '', children: '', totalAmount: '',
 });
 
 const STATUS_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
@@ -141,7 +141,12 @@ export function Reservations() {
     setSubmitting(true);
     setFormError('');
     try {
-      await createReservation(formData);
+      await createReservation({
+        ...formData,
+        adults:      Number(formData.adults)      || 1,
+        children:    Number(formData.children)    || 0,
+        totalAmount: Number(formData.totalAmount) || 0,
+      });
       setShowNew(false);
       setFormData(emptyForm());
       reload();
@@ -407,7 +412,7 @@ export function Reservations() {
               <select value={formData.roomId} onChange={(e) => setFormData({ ...formData, roomId: e.target.value })} className={inputCls}>
                 <option value="">Select room…</option>
                 {rooms.filter((r) => r.status === 'Available').map((r) => (
-                  <option key={r.id} value={r.id}>Room {r.roomNumber} – {r.roomType} (${r.baseRate}/night)</option>
+                  <option key={r.id} value={r.id}>Room {r.roomNumber} – {r.roomType} (RWF {r.baseRate.toLocaleString()}/night)</option>
                 ))}
               </select>
             ), true)}
@@ -429,14 +434,14 @@ export function Reservations() {
               <input type="date" value={formData.checkOutDate} onChange={(e) => setFormData({ ...formData, checkOutDate: e.target.value })} className={inputCls} />
             ), true)}
             {field('Adults', (
-              <input type="number" min={1} max={10} value={formData.adults} onChange={(e) => setFormData({ ...formData, adults: Number(e.target.value) })} className={inputCls} />
+              <input type="number" min={1} max={10} value={formData.adults} placeholder="1" onChange={(e) => setFormData({ ...formData, adults: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
             ))}
             {field('Children', (
-              <input type="number" min={0} max={10} value={formData.children} onChange={(e) => setFormData({ ...formData, children: Number(e.target.value) })} className={inputCls} />
+              <input type="number" min={0} max={10} value={formData.children} placeholder="0" onChange={(e) => setFormData({ ...formData, children: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
             ))}
             <div className="sm:col-span-2">
-              {field('Total Amount (USD)', (
-                <input type="number" min={0} step="0.01" value={formData.totalAmount} onChange={(e) => setFormData({ ...formData, totalAmount: Number(e.target.value) })} className={inputCls} />
+              {field('Total Amount (RWF)', (
+                <input type="number" min={0} step="1" value={formData.totalAmount} placeholder="0" onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
               ))}
             </div>
           </div>

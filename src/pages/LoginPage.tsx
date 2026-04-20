@@ -59,7 +59,7 @@ export function LoginPage() {
           {/* Hotel ID */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-              Hotel ID <span className="normal-case text-slate-500">(leave blank if superadmin)</span>
+              Hotel ID
             </label>
             <input
               className={inputCls}
