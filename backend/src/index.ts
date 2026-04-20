@@ -1,6 +1,5 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+import express, { Request, Response, NextFunction } from 'express';
 
 import guestsRouter       from './routes/guests';
 import roomsRouter        from './routes/rooms';
@@ -20,28 +19,26 @@ import adminRouter        from './routes/admin';
 import { authenticate, AuthRequest } from './middleware/authenticate';
 import { errorHandler, notFound }    from './middleware/errorHandler';
 
-const app        = express();
-const PORT       = Number(process.env.PORT ?? 4000);
+const app  = express();
+const PORT = Number(process.env.PORT ?? 4000);
+
 const rawCorsOrigins = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
-const allowedOrigins = rawCorsOrigins
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = rawCorsOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow non-browser requests (no Origin header), e.g. curl/postman/health checks.
-    if (!origin) return callback(null, true);
+console.log('Allowed CORS origins:', allowedOrigins);
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin as string | undefined;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-user-id');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-}));
 app.use(express.json());
 
 // ── Public paths (no auth required) ──────────────────────────────────────────
