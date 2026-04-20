@@ -16,9 +16,10 @@ export function BrandLogo({ variant, className = '' }: BrandLogoProps) {
     <img
       src={src}
       alt="Servv logo"
-      className={`w-auto object-contain ${className}`.trim()}
+      className={`block w-auto object-contain select-none ${className}`.trim()}
       loading="eager"
       decoding="async"
+      draggable={false}
     />
   );
 }

@@ -52,12 +52,14 @@ export function Sidebar() {
       <div className="absolute inset-0 pointer-events-none bg-amber-500/5" />
 
       <div className="relative p-6 pb-4 flex items-center gap-3 border-b border-slate-800/80">
-        <BrandLogo variant="light" className="h-8" />
-        <div>
-          <span className="text-white font-bold text-xl tracking-tight block">
+        <div className="w-24 sm:w-28 shrink-0 flex items-center">
+          <BrandLogo variant="light" className="h-7 sm:h-8" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="text-white font-bold text-base sm:text-lg tracking-tight block truncate leading-tight">
             {user?.hotelName ?? 'SERVV HMS'}
           </span>
-          <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Servv HMS</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-slate-400 truncate block mt-0.5">Servv HMS</span>
         </div>
       </div>
 
