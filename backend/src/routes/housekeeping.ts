@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../lib/supabase';
+import { sendTaskAssigned } from '../services/whatsapp';
 
 const router = Router();
 
@@ -68,7 +69,35 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .single();
 
     if (error) throw new Error(error.message);
-    res.status(201).json(toTask(data));
+    const task = toTask(data);
+
+    // Notify assigned staff member via WhatsApp
+    const st = task.staff as Record<string, unknown> | null;
+    const rm = task.room  as Record<string, unknown> | null;
+    if (st && b.assignedStaffId) {
+      // Fetch staff phone from staff_members table
+      const staffQuery = supabase
+        .from('staff_members')
+        .select('phone, email')
+        .eq('id', String(b.assignedStaffId))
+        .single();
+
+      Promise.resolve(staffQuery).then(({ data: staffRow }) => {
+        const sr    = staffRow as Record<string, unknown> | null;
+        const phone = String(sr?.phone ?? sr?.email ?? '');
+        sendTaskAssigned({
+          phone,
+          staffName: `${st.firstName} ${st.lastName}`,
+          roomNo:    rm ? String(rm.roomNumber) : String(b.roomId),
+          roomType:  rm ? String(rm.roomType)   : '',
+          priority:  String(b.priority ?? 'Normal'),
+          dueAt:     b.dueAt ? String(b.dueAt) : undefined,
+          notes:     b.notes ? String(b.notes) : undefined,
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
+    res.status(201).json(task);
   } catch (err) {
     next(err);
   }

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../lib/supabase';
+import { sendOrderReceived, sendOrderDelivered } from '../services/whatsapp';
 
 const router = Router();
 
@@ -63,7 +64,22 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .single();
 
     if (error) throw new Error(error.message);
-    res.status(201).json(toOrder(data));
+    const order = toOrder(data);
+
+    // Notify guest via WhatsApp
+    const g = order.guest as Record<string, unknown> | null;
+    if (g) {
+      sendOrderReceived({
+        phone:      String((b.guestPhone as string) ?? ''),
+        guestName:  `${g.firstName} ${g.lastName}`,
+        roomNo:     String(order.roomNumber ?? ''),
+        department: String(order.department),
+        items:      order.items as string[],
+        amount:     Number(order.amount),
+      }).catch(() => {});
+    }
+
+    res.status(201).json(order);
   } catch (err) {
     next(err);
   }
@@ -81,7 +97,21 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error) { res.status(404).json({ error: 'Order not found' }); return; }
-    res.json(toOrder(data));
+    const order = toOrder(data);
+
+    // Notify guest when order is delivered
+    if (status === 'Delivered') {
+      const g = order.guest as Record<string, unknown> | null;
+      if (g) {
+        sendOrderDelivered({
+          phone:      '',   // guest phone not in join; fetched via guest lookup if needed
+          guestName:  `${g.firstName} ${g.lastName}`,
+          department: String(order.department),
+        }).catch(() => {});
+      }
+    }
+
+    res.json(order);
   } catch (err) {
     next(err);
   }

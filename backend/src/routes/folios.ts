@@ -97,4 +97,57 @@ router.patch('/:id/close', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// ── POST /api/folios/charge/:reservationId ────────────────────────────────────
+// Called by the scanner/POS when a guest charges a restaurant bill to their room.
+// Auth: x-api-key header (shared secret between scanner and HMS).
+router.post('/charge/:reservationId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (!process.env.SCANNER_API_KEY || apiKey !== process.env.SCANNER_API_KEY) {
+      res.status(401).json({ error: 'Invalid API key' }); return;
+    }
+
+    const { description, amount, currency = 'USD', quantity = 1 } = req.body as {
+      description: string; amount: number; currency?: string; quantity?: number;
+    };
+
+    if (!description || amount == null) {
+      res.status(400).json({ error: 'description and amount are required' }); return;
+    }
+
+    // Find or create folio
+    let { data: folio } = await supabase
+      .from('folios')
+      .select('id, is_closed')
+      .eq('reservation_id', req.params.reservationId)
+      .maybeSingle();
+
+    if (!folio) {
+      const { data: newFolio, error } = await supabase
+        .from('folios')
+        .insert({ reservation_id: req.params.reservationId, currency })
+        .select('id, is_closed')
+        .single();
+      if (error) { res.status(404).json({ error: 'Reservation not found' }); return; }
+      folio = newFolio;
+    }
+
+    if (folio.is_closed) {
+      res.status(400).json({ error: 'Folio is already closed — guest has checked out' }); return;
+    }
+
+    const { data: lineItem, error } = await supabase
+      .from('folio_line_items')
+      .insert({ folio_id: folio.id, description, quantity, unit_price: amount })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    res.status(201).json({ success: true, lineItem: toLineItem(lineItem) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

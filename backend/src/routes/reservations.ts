@@ -1,5 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../lib/supabase';
+import {
+  sendBookingConfirmation,
+  sendCheckinWelcome,
+  sendCheckoutSummary,
+} from '../services/whatsapp';
+
+const currFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 const router = Router();
 
@@ -29,6 +36,7 @@ function toReservation(row: Record<string, unknown>) {
       firstName: g.first_name,
       lastName:  g.last_name,
       email:     g.email,
+      phone:     g.phone,
     } : null,
     room: rm ? {
       id:         rm.id,
@@ -45,10 +53,12 @@ function toReservation(row: Record<string, unknown>) {
 
 const JOIN_QUERY = `
   *,
-  guests ( id, first_name, last_name, email ),
+  guests ( id, first_name, last_name, email, phone ),
   rooms  ( id, room_number, room_type ),
   rate_plans ( id, code, name )
 `;
+
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
 
 // GET /api/reservations?status=&channel=
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
@@ -109,7 +119,30 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .single();
 
     if (error) throw new Error(error.message);
-    res.status(201).json(toReservation(data));
+    const r = toReservation(data);
+
+    // Fire-and-forget WhatsApp confirmation + check-in link
+    const g  = r.guest as Record<string, unknown> | null;
+    const rm = r.room  as Record<string, unknown> | null;
+    if (g && String(g.phone ?? '').length > 5) {
+      const phone     = String(g.phone);
+      const guestName = `${g.firstName} ${g.lastName}`;
+      const checkinUrl = `${FRONTEND_URL}/checkin/${r.id}`;
+      sendBookingConfirmation({
+        phone, guestName,
+        bookingId: String(r.id),
+        roomNo:    rm ? String(rm.roomNumber) : '',
+        roomType:  rm ? String(rm.roomType)   : '',
+        checkIn:   String(r.checkInDate),
+        checkOut:  String(r.checkOutDate),
+        adults:    Number(r.adults),
+        children:  Number(r.children),
+        amount:    currFmt.format(Number(r.totalAmount)),
+        checkinUrl,
+      }).catch(() => {});
+    }
+
+    res.status(201).json(r);
   } catch (err) {
     next(err);
   }
@@ -157,7 +190,43 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error) { res.status(404).json({ error: 'Reservation not found' }); return; }
-    res.json(toReservation(data));
+    const r = toReservation(data);
+
+    // WhatsApp on check-in / check-out
+    const g  = r.guest as Record<string, unknown> | null;
+    const rm = r.room  as Record<string, unknown> | null;
+    if (g && rm) {
+      const guestName = `${g.firstName} ${g.lastName}`;
+      const phone     = String(g.phone ?? '');
+
+      if (status === 'Checked-in') {
+        sendCheckinWelcome({
+          phone, guestName,
+          roomNo:   String(rm.roomNumber),
+          roomType: String(rm.roomType),
+          checkOut: String(r.checkOutDate),
+        }).catch(() => {});
+      } else if (status === 'Checked-out') {
+        const folioQuery = supabase
+          .from('folio_line_items')
+          .select('unit_price, quantity, folios!inner(reservation_id)')
+          .eq('folios.reservation_id', req.params.id);
+
+        Promise.resolve(folioQuery).then(({ data: lines }) => {
+          const total = (lines ?? []).reduce(
+            (sum, l) => sum + Number((l as Record<string,unknown>).unit_price) * Number((l as Record<string,unknown>).quantity),
+            0,
+          );
+          sendCheckoutSummary({
+            phone, guestName,
+            roomNo: String(rm.roomNumber),
+            total:  currFmt.format(total),
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    }
+
+    res.json(r);
   } catch (err) {
     next(err);
   }
