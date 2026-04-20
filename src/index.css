@@ -31,10 +31,7 @@ body,
 body {
   font-family: 'Manrope', sans-serif;
   color: var(--text-main);
-  background:
-    radial-gradient(1100px 520px at -5% -10%, rgba(245, 158, 11, 0.1), transparent 60%),
-    radial-gradient(860px 420px at 110% 0%, rgba(2, 6, 23, 0.08), transparent 58%),
-    linear-gradient(180deg, #f9fbff 0%, var(--surface-base) 45%, #f3f6fb 100%);
+  background: #f6f8fb;
   letter-spacing: 0.01em;
 }
 
@@ -43,9 +40,8 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: radial-gradient(rgba(148, 163, 184, 0.16) 0.6px, transparent 0.6px);
-  background-size: 18px 18px;
-  opacity: 0.2;
+  background: rgba(248, 250, 252, 0.35);
+  opacity: 1;
   z-index: -1;
 }
 
@@ -62,7 +58,7 @@ h3 {
 }
 
 .luxury-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.84) 100%);
+  background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 14px 40px -28px rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(5px);
@@ -79,7 +75,9 @@ h3 {
   inset: -40% auto auto -15%;
   width: 300px;
   height: 220px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0) 72%);
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 999px;
+  filter: blur(36px);
   pointer-events: none;
 }
 
@@ -92,7 +90,7 @@ h3 {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(112deg, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0.24) 50%, rgba(255, 255, 255, 0) 65%);
+  background: rgba(255, 255, 255, 0.14);
   transform: translateX(-130%);
   transition: transform 480ms ease;
 }
@@ -105,10 +103,7 @@ h3 {
   position: relative;
   border-radius: 1rem;
   border: 1px solid rgba(245, 158, 11, 0.22);
-  background:
-    radial-gradient(720px 260px at 0% 0%, rgba(245, 158, 11, 0.2), transparent 56%),
-    radial-gradient(620px 240px at 100% 100%, rgba(15, 23, 42, 0.12), transparent 52%),
-    linear-gradient(135deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.93) 100%);
+  background: rgba(30, 41, 59, 0.96);
   box-shadow: 0 22px 40px -28px rgba(2, 6, 23, 0.85);
 }
 
@@ -119,10 +114,7 @@ h3 {
 }
 
 .headline-accent {
-  background: linear-gradient(110deg, #0f172a 5%, #f59e0b 55%, #b45309 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #0f172a;
 }
 
 .focus-ring {

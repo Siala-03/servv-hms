@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   BedDouble,
@@ -159,6 +160,8 @@ const activityFeed = [
 }];
 
 export function Dashboard() {
+  const navigate = useNavigate();
+
   return (
     <motion.div
       initial={{
@@ -182,7 +185,9 @@ export function Dashboard() {
               <UserPlus className="w-4 h-4" />
               Walk-in
             </button>
-            <button className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25">
+            <button
+              onClick={() => navigate('/reservations?new=1')}
+              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25">
               <Plus className="w-4 h-4" />
               New Booking
             </button>
@@ -270,13 +275,6 @@ export function Dashboard() {
                   left: -20,
                   bottom: 0
                 }}>
-                
-                <defs>
-                  <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -315,7 +313,7 @@ export function Dashboard() {
                   stroke="#f59e0b"
                   strokeWidth={3}
                   fillOpacity={1}
-                  fill="url(#colorRate)" />
+                  fill="#fde68a" />
                 
               </AreaChart>
             </ResponsiveContainer>

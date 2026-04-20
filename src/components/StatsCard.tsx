@@ -9,10 +9,10 @@ interface StatsCardProps {
   color?: 'amber' | 'emerald' | 'red' | 'purple';
 }
 const colorMap = {
-  emerald: 'bg-gradient-to-br from-emerald-50 to-emerald-100/70 text-emerald-700 border-emerald-200/70',
-  amber: 'bg-gradient-to-br from-amber-50 to-amber-100/70 text-amber-700 border-amber-200/70',
-  red: 'bg-gradient-to-br from-red-50 to-red-100/70 text-red-700 border-red-200/70',
-  purple: 'bg-gradient-to-br from-purple-50 to-purple-100/70 text-purple-700 border-purple-200/70'
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200/70',
+  amber: 'bg-amber-50 text-amber-700 border-amber-200/70',
+  red: 'bg-red-50 text-red-700 border-red-200/70',
+  purple: 'bg-purple-50 text-purple-700 border-purple-200/70'
 };
 export function StatsCard({
   title,

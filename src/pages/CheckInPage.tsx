@@ -83,7 +83,7 @@ export function CheckInPage() {
   const inputCls = 'w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50 flex flex-col items-center justify-start px-4 py-10 font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-start px-4 py-10 font-sans">
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center mb-3 shadow-lg">

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, Hotel, Users, TrendingUp, Edit2, Trash2,
-  CheckCircle2, XCircle, Loader2, ChevronLeft, Utensils, KeyRound,
+  CheckCircle2, XCircle, Loader2, ChevronLeft, Utensils, KeyRound, LogOut,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { API_BASE } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const API = API_BASE;
 
@@ -47,6 +49,8 @@ const EMPTY_FORM = {
 const inputCls = 'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent';
 
 export function SuperAdminPage() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const { toast } = useToast();
   const [hotels,       setHotels]      = useState<HotelAccount[]>([]);
   const [loading,      setLoading]     = useState(true);
@@ -222,6 +226,11 @@ export function SuperAdminPage() {
   const totalUsers   = hotels.reduce((s, h) => s + h.userCount, 0);
   const activeHotels = hotels.filter((h) => h.isActive).length;
 
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -230,12 +239,20 @@ export function SuperAdminPage() {
           <h1 className="text-2xl font-bold text-slate-900">Hotel Accounts</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage properties and their staff access</p>
         </div>
-        <button
-          onClick={() => { setForm(EMPTY_FORM); setFormError(''); setCreateModal(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Hotel
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Logout
+          </button>
+          <button
+            onClick={() => { setForm(EMPTY_FORM); setFormError(''); setCreateModal(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add Hotel
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

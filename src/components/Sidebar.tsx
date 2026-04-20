@@ -47,10 +47,10 @@ export function Sidebar() {
 
   return (
     <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_30%_0%,rgba(245,158,11,0.20),transparent_38%)]" />
+      <div className="absolute inset-0 pointer-events-none bg-amber-500/5" />
 
       <div className="relative p-6 pb-4 flex items-center gap-3 border-b border-slate-800/80">
-        <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-amber-700 rounded-xl flex items-center justify-center shadow-lg shadow-amber-900/45">
+        <div className="w-9 h-9 bg-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-900/45">
           <span className="text-white font-bold text-lg">S</span>
         </div>
         <div>

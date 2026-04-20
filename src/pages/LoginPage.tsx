@@ -43,12 +43,12 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.12),transparent_55%)]" />
+      <div className="absolute inset-0 pointer-events-none bg-amber-500/10" />
 
       <div className="relative w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center mb-4 shadow-lg shadow-amber-900/50">
+          <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center mb-4 shadow-lg shadow-amber-900/50">
             <Hotel className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">SERVV HMS</h1>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Download, Plus, Calendar as CalendarIcon, List, MoreVertical, X } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
@@ -44,6 +45,7 @@ const STATUS_TRANSITIONS: Record<ReservationStatus, ReservationStatus[]> = {
 };
 
 export function Reservations() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView]               = useState<'list' | 'calendar'>('list');
   const [reservations, setReservations] = useState<ReservationListItem[]>([]);
   const [channels, setChannels]       = useState<string[]>([]);
@@ -97,6 +99,18 @@ export function Reservations() {
     listReservationChannels().then((d) => { if (alive) setChannels(d); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+
+    setFormData(emptyForm());
+    setFormError('');
+    setShowNew(true);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   function reload() {
     setIsLoading(true);
