@@ -169,12 +169,6 @@ export function Intelligence() {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={forecast} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="occGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.03} />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                 <XAxis dataKey="date" tickFormatter={fmtDay} axisLine={false} tickLine={false}
                   tick={{ fill: '#9ca3af', fontSize: 11 }} interval={4} dy={8} />
@@ -188,7 +182,7 @@ export function Intelligence() {
                 <ReferenceLine y={80} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: '80% full', fill: '#ef4444', fontSize: 10, position: 'right' }} />
                 <ReferenceLine y={50} stroke="#6b7280" strokeDasharray="4 4" strokeWidth={1} />
                 <Area type="monotone" dataKey="occupancyRate" stroke="#f59e0b" strokeWidth={2.5}
-                  fill="url(#occGrad)" dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} />
+                  fill="#fde68a" dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}

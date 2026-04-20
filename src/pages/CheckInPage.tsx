@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Hotel, CheckCircle2, AlertCircle, Loader2, Calendar, Users, BedDouble } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Calendar, Users, BedDouble } from 'lucide-react';
 import { API_BASE } from '../lib/api';
+import { BrandLogo } from '../components/BrandLogo';
 
 const API = API_BASE;
 
@@ -86,9 +87,7 @@ export function CheckInPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-start px-4 py-10 font-sans">
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center mb-3 shadow-lg">
-          <Hotel className="w-8 h-8 text-white" />
-        </div>
+        <BrandLogo variant="dark" className="h-11 mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
           {(import.meta as any).env.VITE_HOTEL_NAME ?? 'SERVV Hotel'}
         </h1>

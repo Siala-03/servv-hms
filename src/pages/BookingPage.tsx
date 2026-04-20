@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Hotel, Calendar, Users, BedDouble, ChevronRight, CheckCircle2,
+  Calendar, Users, BedDouble, ChevronRight, CheckCircle2,
   AlertCircle, Loader2, ArrowLeft, Star,
 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
+import { BrandLogo } from '../components/BrandLogo';
 
 const API = API_BASE;
 
@@ -114,12 +115,10 @@ export function BookingPage() {
   const hotelName = avail?.hotel.name ?? 'SERVV Hotel';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-amber-50/30 flex flex-col items-center px-4 py-10 font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center px-4 py-10 font-sans">
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center mb-3 shadow-lg shadow-amber-900/20">
-          <Hotel className="w-8 h-8 text-white" />
-        </div>
+        <BrandLogo variant="dark" className="h-11 mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{hotelName}</h1>
         <p className="text-sm text-slate-500 mt-1">Book your stay directly — no OTA fees</p>
       </div>

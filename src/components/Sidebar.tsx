@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, UserRole, canAccess } from '../lib/rbac';
+import { BrandLogo } from './BrandLogo';
 
 const NAV_ITEMS = [
   { name: 'Dashboard',       path: '/',             icon: LayoutDashboard },
@@ -51,9 +52,7 @@ export function Sidebar() {
       <div className="absolute inset-0 pointer-events-none bg-amber-500/5" />
 
       <div className="relative p-6 pb-4 flex items-center gap-3 border-b border-slate-800/80">
-        <div className="w-9 h-9 bg-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-900/45">
-          <span className="text-white font-bold text-lg">S</span>
-        </div>
+        <BrandLogo variant="light" className="h-8" />
         <div>
           <span className="text-white font-bold text-xl tracking-tight block">
             {user?.hotelName ?? 'SERVV HMS'}
