@@ -4,7 +4,7 @@ import { Sparkles, AlertTriangle, Plus } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
-import { listHousekeepingTasks, updateTaskStatus, createHousekeepingTask } from '../services/housekeepingService';
+import { listHousekeepingTasks, updateTaskStatus, createHousekeepingTask, updateHousekeepingTask } from '../services/housekeepingService';
 import { listRooms } from '../services/roomsService';
 import { listStaff } from '../services/staffService';
 import { HousekeepingTask, TaskStatus, TaskPriority } from '../domain/models';
@@ -46,6 +46,7 @@ export function Housekeeping() {
   const [form, setForm]             = useState<NewTaskForm>(emptyTaskForm());
   const [formError, setFormError]   = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [autoAssigning, setAutoAssigning] = useState(false);
 
   function reload() {
     setIsLoading(true);
@@ -67,6 +68,22 @@ export function Housekeeping() {
   async function handleStatusCycle(task: TaskRow) {
     const next = taskStatusCycle[task.status];
     try { await updateTaskStatus(task.id, next); reload(); } catch { /* ignore */ }
+  }
+
+  async function handleAutoAssign() {
+    setAutoAssigning(true);
+    try {
+      const [allStaff] = await Promise.all([listStaff()]);
+      const hkStaff = allStaff.filter((s) => s.isActive && s.role === 'Housekeeping');
+      if (hkStaff.length === 0) { alert('No active housekeeping staff available.'); return; }
+      const unassigned = tasks.filter((t) => t.status === 'Open' && !t.assignedStaffId);
+      await Promise.all(
+        unassigned.map((task, i) =>
+          updateHousekeepingTask(task.id, { assignedStaffId: hkStaff[i % hkStaff.length].id })
+        )
+      );
+      reload();
+    } catch { /* ignore */ } finally { setAutoAssigning(false); }
   }
 
   async function handleCreate() {
@@ -106,8 +123,12 @@ export function Housekeeping() {
             >
               <Plus className="w-4 h-4" /> New Task
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm">
-              <Sparkles className="w-4 h-4" /> Auto-Assign
+            <button
+              onClick={handleAutoAssign}
+              disabled={autoAssigning}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" /> {autoAssigning ? 'Assigning…' : 'Auto-Assign'}
             </button>
           </div>
         }

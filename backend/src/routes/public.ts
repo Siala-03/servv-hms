@@ -110,4 +110,158 @@ router.post('/checkin/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// ── GET /api/public/book/:hotelId/availability ────────────────────────────────
+// Returns hotel info + rooms not already reserved for the requested date range.
+// Query params: checkIn (YYYY-MM-DD), checkOut (YYYY-MM-DD), guests (number)
+router.get('/book/:hotelId/availability', async (req, res) => {
+  const { hotelId } = req.params;
+  const { checkIn, checkOut } = req.query as { checkIn?: string; checkOut?: string };
+
+  if (!checkIn || !checkOut) {
+    return res.status(400).json({ error: 'checkIn and checkOut are required' });
+  }
+  if (checkIn >= checkOut) {
+    return res.status(400).json({ error: 'checkOut must be after checkIn' });
+  }
+
+  // Hotel info
+  const { data: hotel, error: hotelErr } = await supabase
+    .from('hotel_accounts')
+    .select('id, name, email, phone, address')
+    .eq('id', hotelId)
+    .maybeSingle();
+
+  if (hotelErr || !hotel) {
+    return res.status(404).json({ error: 'Hotel not found' });
+  }
+
+  // All rooms for hotel
+  const { data: rooms } = await supabase
+    .from('rooms')
+    .select('id, room_number, room_type, floor, base_rate, max_occupancy, status')
+    .eq('hotel_id', hotelId)
+    .order('floor')
+    .order('room_number');
+
+  // Find rooms already booked in this range
+  const { data: conflicting } = await supabase
+    .from('reservations')
+    .select('room_id')
+    .eq('hotel_id', hotelId)
+    .not('status', 'in', '("Cancelled","Checked-out")')
+    .lt('check_in_date', checkOut)
+    .gt('check_out_date', checkIn);
+
+  const takenIds = new Set((conflicting ?? []).map((r: any) => r.room_id));
+
+  const nights = Math.round(
+    (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86_400_000,
+  );
+
+  const available = (rooms ?? [])
+    .filter((r: any) => r.status !== 'Maintenance' && !takenIds.has(r.id))
+    .map((r: any) => ({
+      id:           r.id,
+      roomNumber:   r.room_number,
+      roomType:     r.room_type,
+      floor:        r.floor,
+      baseRate:     Number(r.base_rate),
+      maxOccupancy: r.max_occupancy,
+      totalPrice:   Math.round(Number(r.base_rate) * nights),
+    }));
+
+  res.json({ hotel: { id: hotel.id, name: hotel.name }, nights, available });
+});
+
+// ── POST /api/public/book/:hotelId ────────────────────────────────────────────
+// Guest submits booking: upsert guest by email, create Pending reservation.
+router.post('/book/:hotelId', async (req, res) => {
+  const { hotelId } = req.params;
+  const {
+    firstName, lastName, email, phone,
+    roomId, checkIn, checkOut, adults, children, totalAmount,
+  } = req.body as {
+    firstName: string; lastName: string; email: string; phone: string;
+    roomId: string; checkIn: string; checkOut: string;
+    adults: number; children: number; totalAmount: number;
+  };
+
+  if (!firstName || !lastName || !email || !phone || !roomId || !checkIn || !checkOut) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Verify hotel exists
+  const { data: hotel } = await supabase
+    .from('hotel_accounts')
+    .select('id')
+    .eq('id', hotelId)
+    .maybeSingle();
+
+  if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+
+  // Verify room is still available (re-check for race conditions)
+  const { data: conflict } = await supabase
+    .from('reservations')
+    .select('id')
+    .eq('room_id', roomId)
+    .not('status', 'in', '("Cancelled","Checked-out")')
+    .lt('check_in_date', checkOut)
+    .gt('check_out_date', checkIn)
+    .maybeSingle();
+
+  if (conflict) return res.status(409).json({ error: 'Sorry, this room was just booked. Please select another.' });
+
+  // Upsert guest by email (within hotel scope)
+  let guestId: string;
+  const { data: existingGuest } = await supabase
+    .from('guests')
+    .select('id')
+    .eq('hotel_id', hotelId)
+    .eq('email', email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (existingGuest) {
+    guestId = existingGuest.id;
+  } else {
+    const { data: newGuest, error: guestErr } = await supabase
+      .from('guests')
+      .insert({
+        hotel_id:   hotelId,
+        first_name: firstName.trim(),
+        last_name:  lastName.trim(),
+        email:      email.trim().toLowerCase(),
+        phone:      phone.trim(),
+      })
+      .select('id')
+      .single();
+
+    if (guestErr || !newGuest) return res.status(500).json({ error: 'Failed to create guest record' });
+    guestId = newGuest.id;
+  }
+
+  // Create reservation
+  const { data: reservation, error: resErr } = await supabase
+    .from('reservations')
+    .insert({
+      hotel_id:       hotelId,
+      guest_id:       guestId,
+      room_id:        roomId,
+      rate_plan_id:   null,
+      channel:        'Direct',
+      status:         'Pending',
+      check_in_date:  checkIn,
+      check_out_date: checkOut,
+      adults:         adults ?? 1,
+      children:       children ?? 0,
+      total_amount:   totalAmount ?? 0,
+      currency:       'USD',
+    })
+    .select('id')
+    .single();
+
+  if (resErr || !reservation) return res.status(500).json({ error: 'Failed to create reservation' });
+
+  res.json({ bookingId: reservation.id });
+});
+
 export default router;

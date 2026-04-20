@@ -9,6 +9,7 @@ import { Layout } from './components/Layout';
 
 import { LoginPage }      from './pages/LoginPage';
 import { CheckInPage }    from './pages/CheckInPage';
+import { BookingPage }    from './pages/BookingPage';
 import { Dashboard }      from './pages/Dashboard';
 import { Reservations }   from './pages/Reservations';
 import { ChannelManager } from './pages/ChannelManager';
@@ -42,6 +43,7 @@ export function App() {
             {/* Public */}
             <Route path="/login"                    element={<LoginPage />} />
             <Route path="/checkin/:bookingId"        element={<CheckInPage />} />
+            <Route path="/book/:hotelId"             element={<BookingPage />} />
             <Route path="/unauthorized"             element={<Unauthorized />} />
 
             {/* Superadmin-only */}

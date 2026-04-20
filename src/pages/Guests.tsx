@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, MessageSquare, Star, Clock, AlertCircle, CheckCircle2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
@@ -6,27 +6,25 @@ import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { listGuests, createGuest, updateGuest, deleteGuest } from '../services/guestsService';
-import { GuestProfile } from '../domain/models';
+import { listHousekeepingTasks, updateTaskStatus, updateHousekeepingTask } from '../services/housekeepingService';
+import { listStaff } from '../services/staffService';
+import { GuestProfile, StaffMember } from '../domain/models';
 
 type LoyaltyTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | '';
 
 interface GuestForm {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  loyaltyTier: LoyaltyTier;
+  firstName: string; lastName: string; email: string; phone: string; loyaltyTier: LoyaltyTier;
+}
+
+interface TaskRow {
+  id: string; status: string; priority: string; notes?: string | null;
+  roomId: string; assignedStaffId?: string | null; createdAt?: string;
+  room?:  { id: string; roomNumber: string; roomType: string } | null;
+  staff?: { id: string; firstName: string; lastName: string } | null;
+  guest?: { firstName: string; lastName: string } | null;
 }
 
 const emptyForm = (): GuestForm => ({ firstName: '', lastName: '', email: '', phone: '', loyaltyTier: '' });
-
-// Static guest requests (not yet in API schema)
-const GUEST_REQUESTS = [
-  { id: 'REQ-001', room: '304', guest: 'Eleanor Shellstrop', type: 'Housekeeping', desc: 'Extra towels and pillows please', priority: 'Normal', status: 'Open', time: '10 mins ago', assignee: 'Unassigned' },
-  { id: 'REQ-002', room: '215', guest: 'Chidi Anagonye', type: 'Maintenance', desc: 'AC is making a weird noise', priority: 'High', status: 'In Progress', time: '45 mins ago', assignee: 'Bob (Maint)' },
-  { id: 'REQ-003', room: '501', guest: 'Tahani Al-Jamil', type: 'Concierge', desc: 'Dinner reservations for 4 at Dorsia', priority: 'Normal', status: 'Resolved', time: '2 hours ago', assignee: 'Sarah (Concierge)' },
-  { id: 'REQ-004', room: '112', guest: 'Jason Mendoza', type: 'Room Service', desc: 'Late night menu request', priority: 'Normal', status: 'Open', time: '5 mins ago', assignee: 'Unassigned' },
-];
 
 export function Guests() {
   const [activeTab, setActiveTab] = useState<'directory' | 'requests'>('requests');
@@ -34,36 +32,55 @@ export function Guests() {
   const [search, setSearch]       = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Modals
-  const [showForm, setShowForm]       = useState(false);
-  const [editing, setEditing]         = useState<GuestProfile | null>(null);
-  const [form, setForm]               = useState<GuestForm>(emptyForm());
-  const [formError, setFormError]     = useState('');
-  const [submitting, setSubmitting]   = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<GuestProfile | null>(null);
+  // Requests
+  const [tasks, setTasks]               = useState<TaskRow[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [assignTarget, setAssignTarget] = useState<TaskRow | null>(null);
+  const [staffList, setStaffList]       = useState<StaffMember[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [actionBusy, setActionBusy]     = useState(false);
 
-  function reload() {
+  // Guest form
+  const [showForm, setShowForm]           = useState(false);
+  const [editing, setEditing]             = useState<GuestProfile | null>(null);
+  const [form, setForm]                   = useState<GuestForm>(emptyForm());
+  const [formError, setFormError]         = useState('');
+  const [submitting, setSubmitting]       = useState(false);
+  const [deleteTarget, setDeleteTarget]   = useState<GuestProfile | null>(null);
+
+  function reloadGuests() {
     setIsLoading(true);
     listGuests().then(setGuests).catch(() => setGuests([])).finally(() => setIsLoading(false));
   }
-  useEffect(() => { reload(); }, []);
+
+  function reloadTasks() {
+    setTasksLoading(true);
+    listHousekeepingTasks()
+      .then((d) => setTasks(d as unknown as TaskRow[]))
+      .catch(() => setTasks([]))
+      .finally(() => setTasksLoading(false));
+  }
+
+  useEffect(() => { reloadGuests(); reloadTasks(); }, []);
 
   function openCreate() { setEditing(null); setForm(emptyForm()); setFormError(''); setShowForm(true); }
-  function openEdit(g: GuestProfile) { setEditing(g); setForm({ firstName: g.firstName, lastName: g.lastName, email: g.email, phone: g.phone, loyaltyTier: (g.loyaltyTier ?? '') as LoyaltyTier }); setFormError(''); setShowForm(true); }
+  function openEdit(g: GuestProfile) {
+    setEditing(g);
+    setForm({ firstName: g.firstName, lastName: g.lastName, email: g.email, phone: g.phone, loyaltyTier: (g.loyaltyTier ?? '') as LoyaltyTier });
+    setFormError(''); setShowForm(true);
+  }
 
   async function handleSubmit() {
     if (!form.firstName || !form.lastName || !form.email || !form.phone) {
       setFormError('First name, last name, email, and phone are required.');
       return;
     }
-    setSubmitting(true);
-    setFormError('');
+    setSubmitting(true); setFormError('');
     const payload = { ...form, loyaltyTier: form.loyaltyTier || undefined } as Omit<GuestProfile, 'id' | 'createdAt'>;
     try {
       if (editing) await updateGuest(editing.id, payload);
       else await createGuest(payload);
-      setShowForm(false);
-      reload();
+      setShowForm(false); reloadGuests();
     } catch (e) {
       setFormError((e as Error).message ?? 'Failed to save guest.');
     } finally { setSubmitting(false); }
@@ -72,15 +89,41 @@ export function Guests() {
   async function handleDelete() {
     if (!deleteTarget) return;
     setSubmitting(true);
-    try { await deleteGuest(deleteTarget.id); reload(); }
+    try { await deleteGuest(deleteTarget.id); reloadGuests(); }
     finally { setSubmitting(false); setDeleteTarget(null); }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500';
+  async function openAssign(task: TaskRow) {
+    setAssignTarget(task); setSelectedStaff(task.assignedStaffId ?? '');
+    if (staffList.length === 0) {
+      const s = await listStaff().catch(() => []);
+      setStaffList(s);
+    }
+  }
 
+  async function handleAssign() {
+    if (!assignTarget) return;
+    setActionBusy(true);
+    try {
+      await updateHousekeepingTask(assignTarget.id, { assignedStaffId: selectedStaff || undefined });
+      setAssignTarget(null); reloadTasks();
+    } finally { setActionBusy(false); }
+  }
+
+  async function handleResolve(task: TaskRow) {
+    setActionBusy(true);
+    try { await updateTaskStatus(task.id, 'Resolved'); reloadTasks(); }
+    finally { setActionBusy(false); }
+  }
+
+  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500';
   const visible = search
     ? guests.filter((g) => `${g.firstName} ${g.lastName} ${g.email}`.toLowerCase().includes(search.toLowerCase()))
     : guests;
+
+  const openTasks      = tasks.filter((t) => t.status === 'Open').length;
+  const inProgTasks    = tasks.filter((t) => t.status === 'In Progress').length;
+  const resolvedTasks  = tasks.filter((t) => t.status === 'Resolved').length;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -106,10 +149,10 @@ export function Guests() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
-              { icon: AlertCircle, label: 'Open', val: GUEST_REQUESTS.filter((r) => r.status === 'Open').length, bg: 'bg-amber-50', ic: 'text-amber-600' },
-              { icon: Clock, label: 'In Progress', val: GUEST_REQUESTS.filter((r) => r.status === 'In Progress').length, bg: 'bg-amber-50', ic: 'text-amber-600' },
-              { icon: CheckCircle2, label: 'Resolved Today', val: GUEST_REQUESTS.filter((r) => r.status === 'Resolved').length, bg: 'bg-emerald-50', ic: 'text-emerald-600' },
-              { icon: Star, label: 'Avg Resolution', val: '14m', bg: 'bg-purple-50', ic: 'text-purple-600' },
+              { icon: AlertCircle,  label: 'Open',           val: openTasks,     bg: 'bg-amber-50',   ic: 'text-amber-600' },
+              { icon: Clock,        label: 'In Progress',     val: inProgTasks,   bg: 'bg-amber-50',   ic: 'text-amber-600' },
+              { icon: CheckCircle2, label: 'Resolved Today',  val: resolvedTasks, bg: 'bg-emerald-50', ic: 'text-emerald-600' },
+              { icon: Star,         label: 'Total Tasks',     val: tasks.length,  bg: 'bg-purple-50',  ic: 'text-purple-600' },
             ].map(({ icon: Icon, label, val, bg, ic }) => (
               <div key={label} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center ${ic}`}><Icon className="w-5 h-5" /></div>
@@ -119,38 +162,51 @@ export function Guests() {
           </div>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-2">
-                <select className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-                  <option>All Types</option><option>Housekeeping</option><option>Maintenance</option><option>Concierge</option><option>Room Service</option>
-                </select>
-                <select className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-                  <option>All Statuses</option><option>Open</option><option>In Progress</option><option>Resolved</option>
-                </select>
-              </div>
+              <span className="text-sm font-medium text-gray-700">Housekeeping Tasks</span>
             </div>
             <div className="divide-y divide-gray-100">
-              {GUEST_REQUESTS.map((req) => (
-                <div key={req.id} className="p-4 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+              {tasksLoading ? (
+                <div className="p-8 text-center text-gray-400 text-sm">Loading tasks…</div>
+              ) : tasks.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm">No active requests.</div>
+              ) : tasks.map((task) => (
+                <div key={task.id} className="p-4 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-lg bg-gray-100 flex flex-col items-center justify-center shrink-0">
                       <span className="text-xs text-gray-500 font-medium">Room</span>
-                      <span className="text-sm font-bold text-gray-900">{req.room}</span>
+                      <span className="text-sm font-bold text-gray-900">{task.room?.roomNumber ?? '—'}</span>
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gray-900">{req.type}</span>
-                        <StatusBadge status={req.priority} /><StatusBadge status={req.status} />
+                        <span className="font-semibold text-gray-900">{task.room?.roomType ?? 'Housekeeping'}</span>
+                        <StatusBadge status={task.priority} /><StatusBadge status={task.status} />
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">{req.desc}</p>
+                      {task.notes && <p className="text-sm text-gray-600 mb-1">{task.notes}</p>}
                       <div className="flex items-center gap-3 text-xs text-gray-500">
-                        <span>{req.guest}</span><span>•</span><span>{req.time}</span><span>•</span><span>Assignee: {req.assignee}</span>
+                        <span>Assignee: {task.staff ? `${task.staff.firstName} ${task.staff.lastName}` : 'Unassigned'}</span>
+                        <span>•</span>
+                        {task.createdAt && <span>{new Date(task.createdAt).toLocaleDateString()}</span>}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {req.status === 'Open' && <button className="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-sm font-medium transition-colors">Assign</button>}
-                    {req.status === 'In Progress' && <button className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-sm font-medium transition-colors">Resolve</button>}
-                    <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"><MessageSquare className="w-4 h-4" /></button>
+                    {task.status === 'Open' && (
+                      <button
+                        onClick={() => openAssign(task)}
+                        disabled={actionBusy}
+                        className="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >Assign</button>
+                    )}
+                    {task.status === 'In Progress' && (
+                      <button
+                        onClick={() => handleResolve(task)}
+                        disabled={actionBusy}
+                        className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >Resolve</button>
+                    )}
+                    <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                      <MessageSquare className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -224,6 +280,33 @@ export function Guests() {
         </div>
       )}
 
+      {/* ── Assign Staff Modal ──────────────────────────────────── */}
+      {assignTarget && (
+        <Modal
+          title="Assign Staff"
+          onClose={() => setAssignTarget(null)}
+          size="sm"
+          footer={
+            <>
+              <button onClick={() => setAssignTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium">Cancel</button>
+              <button onClick={handleAssign} disabled={actionBusy} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50">
+                {actionBusy ? 'Saving…' : 'Assign'}
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Staff Member</label>
+            <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className={inputCls}>
+              <option value="">Unassigned</option>
+              {staffList.filter((s) => s.isActive).map((s) => (
+                <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.role})</option>
+              ))}
+            </select>
+          </div>
+        </Modal>
+      )}
+
       {/* ── Guest Form Modal ────────────────────────────────────── */}
       {showForm && (
         <Modal
@@ -244,7 +327,7 @@ export function Guests() {
             {[['First Name', 'firstName'], ['Last Name', 'lastName']].map(([label, key]) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{label} <span className="text-red-500">*</span></label>
-                <input type="text" value={(form as Record<string, string>)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className={inputCls} />
+                <input type="text" value={(form as unknown as Record<string, string>)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className={inputCls} />
               </div>
             ))}
             <div className="col-span-2">
@@ -279,5 +362,4 @@ export function Guests() {
       )}
     </motion.div>
   );
-
 }

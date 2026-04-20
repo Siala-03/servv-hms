@@ -165,6 +165,18 @@ export function Reservations() {
     }
   }
 
+  function exportCSV() {
+    const rows = [
+      ['ID', 'Guest', 'Email', 'Room', 'Room No', 'Check-in', 'Check-out', 'Channel', 'Status', 'Amount'],
+      ...visible.map((r) => [r.id, r.guest, r.email, r.room, r.roomNo, r.checkIn, r.checkOut, r.channel, r.status, r.amount]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `reservations-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  }
+
   // ── Cancel booking ────────────────────────────────────────────
   async function handleCancel() {
     if (!cancelTarget) return;
@@ -206,8 +218,11 @@ export function Reservations() {
                 <CalendarIcon className="w-4 h-4" />
               </button>
             </div>
-            <button className="focus-ring flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm">
-              <Download className="w-4 h-4" /> Export
+            <button
+              onClick={exportCSV}
+              className="focus-ring flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm"
+            >
+              <Download className="w-4 h-4" /> Export CSV
             </button>
             <button
               onClick={() => { setFormData(emptyForm()); setFormError(''); setShowNew(true); }}

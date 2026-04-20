@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../lib/supabase';
+import { getBookingComHotelId, syncBookingCom } from '../services/bookingCom';
 
 const router = Router();
 
@@ -13,6 +14,29 @@ function toChannel(row: Record<string, unknown>) {
     syncedAt:          row.synced_at,
     errorMessage:      row.error_message ?? undefined,
   };
+}
+
+async function insertChannelSyncResult(payload: {
+  channel: string;
+  inventoryUpdated: number;
+  ratesUpdated: number;
+  status: string;
+  errorMessage?: string;
+}) {
+  const { data, error } = await supabase
+    .from('channel_sync_results')
+    .insert({
+      channel: payload.channel,
+      inventory_updated: payload.inventoryUpdated,
+      rates_updated: payload.ratesUpdated,
+      status: payload.status,
+      error_message: payload.errorMessage ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return toChannel(data);
 }
 
 // GET /api/channels  – latest sync result per channel
@@ -59,20 +83,80 @@ router.get('/history', async (_req: Request, res: Response, next: NextFunction) 
 router.post('/sync', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const b = req.body as Record<string, unknown>;
-    const { data, error } = await supabase
-      .from('channel_sync_results')
-      .insert({
-        channel:            b.channel,
-        inventory_updated:  b.inventoryUpdated ?? 0,
-        rates_updated:      b.ratesUpdated ?? 0,
-        status:             b.status ?? 'Connected',
-        error_message:      b.errorMessage ?? null,
-      })
-      .select()
-      .single();
+    const record = await insertChannelSyncResult({
+      channel: String(b.channel ?? 'Unknown'),
+      inventoryUpdated: Number(b.inventoryUpdated ?? 0),
+      ratesUpdated: Number(b.ratesUpdated ?? 0),
+      status: String(b.status ?? 'Connected'),
+      errorMessage: b.errorMessage ? String(b.errorMessage) : undefined,
+    });
+
+    res.status(201).json(record);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/channels/booking-com/sync – live Booking.com sync
+router.post('/booking-com/sync', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const hotelId = getBookingComHotelId();
+
+    const { data: roomRows, error } = await supabase
+      .from('rooms')
+      .select('room_type, status, base_rate');
 
     if (error) throw new Error(error.message);
-    res.status(201).json(toChannel(data));
+
+    const aggregated = new Map<string, { totalRooms: number; availableRooms: number; baseRate: number }>();
+    for (const room of roomRows ?? []) {
+      const key = String(room.room_type);
+      const existing = aggregated.get(key) ?? { totalRooms: 0, availableRooms: 0, baseRate: Number(room.base_rate ?? 0) };
+
+      existing.totalRooms += 1;
+      if (room.status === 'Available') existing.availableRooms += 1;
+      if (!existing.baseRate) existing.baseRate = Number(room.base_rate ?? 0);
+
+      aggregated.set(key, existing);
+    }
+
+    const payload = {
+      hotelId,
+      requestedAt: new Date().toISOString(),
+      rooms: Array.from(aggregated.entries()).map(([roomType, stats]) => ({
+        roomType,
+        totalRooms: stats.totalRooms,
+        availableRooms: stats.availableRooms,
+        baseRate: stats.baseRate,
+      })),
+    };
+
+    try {
+      const result = await syncBookingCom(payload);
+      const record = await insertChannelSyncResult({
+        channel: 'Booking.com',
+        inventoryUpdated: result.inventoryUpdated,
+        ratesUpdated: result.ratesUpdated,
+        status: 'Connected',
+        errorMessage: result.statusText,
+      });
+
+      res.status(201).json(record);
+    } catch (syncErr) {
+      const message = syncErr instanceof Error ? syncErr.message : 'Booking.com sync failed';
+      const record = await insertChannelSyncResult({
+        channel: 'Booking.com',
+        inventoryUpdated: 0,
+        ratesUpdated: 0,
+        status: 'Disconnected',
+        errorMessage: message,
+      });
+
+      res.status(502).json({
+        ...record,
+        error: message,
+      });
+    }
   } catch (err) {
     next(err);
   }

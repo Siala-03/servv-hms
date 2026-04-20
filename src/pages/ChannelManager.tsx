@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, AlertCircle, CheckCircle2, Loader2, WifiOff } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, Loader2, WifiOff, Copy, Check, Globe } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { api } from '../lib/api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Channel {
   id:               string;
@@ -51,8 +52,12 @@ function timeSince(isoStr: string) {
   return `${Math.floor(hrs / 24)} day${Math.floor(hrs / 24) !== 1 ? 's' : ''} ago`;
 }
 
+const FRONTEND = (import.meta as any).env.VITE_FRONTEND_URL ?? window.location.origin;
+
 export function ChannelManager() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [copied, setCopied] = useState<'link' | 'iframe' | null>(null);
   const [channels,  setChannels]  = useState<Channel[]>([]);
   const [logs,      setLogs]      = useState<SyncLog[]>([]);
   const [rooms,     setRooms]     = useState<Room[]>([]);
@@ -97,11 +102,14 @@ export function ChannelManager() {
       const connected = displayChannels.filter((c) => c.status !== 'Disconnected');
       await Promise.all(
         connected.map((c) =>
-          api.post('/api/channels/sync', {
-            channel: c.channel, status: 'Connected',
-            inventoryUpdated: Math.floor(Math.random() * 20) + 1,
-            ratesUpdated:     Math.floor(Math.random() * 10) + 1,
-          })
+          c.channel === 'Booking.com'
+            ? api.post('/api/channels/booking-com/sync', {}, 'Booking.com live sync')
+            : api.post('/api/channels/sync', {
+                channel: c.channel,
+                status: 'Connected',
+                inventoryUpdated: Math.floor(Math.random() * 20) + 1,
+                ratesUpdated: Math.floor(Math.random() * 10) + 1,
+              })
         )
       );
       toast('All channels synced', 'success');
@@ -138,7 +146,9 @@ export function ChannelManager() {
   async function reconnect(ch: Channel) {
     setToggling(ch.channel);
     try {
-      if (ch.id === ch.channel) {
+      if (ch.channel === 'Booking.com') {
+        await api.post('/api/channels/booking-com/sync', {}, 'Booking.com reconnect sync');
+      } else if (ch.id === ch.channel) {
         await api.post('/api/channels/sync', {
           channel: ch.channel, status: 'Connected',
           inventoryUpdated: 0, ratesUpdated: 0,
@@ -153,6 +163,13 @@ export function ChannelManager() {
     } finally {
       setToggling(null);
     }
+  }
+
+  function copyText(text: string, key: 'link' | 'iframe') {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
   }
 
   // Unique room types with average base rate
@@ -341,6 +358,66 @@ export function ChannelManager() {
             </div>
           </div>
         </>
+      )}
+      {/* ── Direct Booking Widget ──────────────────────────────── */}
+      {user?.hotelId && (
+        <div className="mt-6 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Globe className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Direct Booking Widget</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Embed your booking page on your website to capture direct bookings — no OTA commission.</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-5">
+            {(() => {
+              const bookingUrl = `${FRONTEND}/book/${user.hotelId}`;
+              const iframeCode = `<iframe src="${bookingUrl}" width="100%" height="700" style="border:none;border-radius:16px;" title="Book your stay"></iframe>`;
+              return (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Booking Page Link</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs text-gray-700 truncate">{bookingUrl}</div>
+                      <button
+                        onClick={() => copyText(bookingUrl, 'link')}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors"
+                      >
+                        {copied === 'link' ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy Link</>}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">Share this link in emails, WhatsApp, or your Google Business profile.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Embed Code (iframe)</label>
+                    <div className="flex items-start gap-2">
+                      <pre className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs text-gray-700 whitespace-pre-wrap break-all">{iframeCode}</pre>
+                      <button
+                        onClick={() => copyText(iframeCode, 'iframe')}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-lg text-xs font-medium hover:bg-slate-900 transition-colors"
+                      >
+                        {copied === 'iframe' ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5">Paste this into any page on your website to show the booking widget inline.</p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-emerald-800 mb-1">Why use direct bookings?</p>
+                    <ul className="text-xs text-emerald-700 space-y-1 list-disc list-inside">
+                      <li>0% OTA commission — keep 100% of the booking value</li>
+                      <li>Guest goes directly into your HMS — no manual entry</li>
+                      <li>Works on any website, WhatsApp bio, or Google Business</li>
+                    </ul>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
       )}
     </motion.div>
   );
