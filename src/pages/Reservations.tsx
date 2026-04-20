@@ -237,16 +237,16 @@ export function Reservations() {
       <section className="hero-banner p-5 sm:p-6 mb-6 text-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/90 font-semibold mb-1.5">Reservation Flow</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1.5">Reservation Flow</p>
             <p className="text-sm text-slate-200">High conversion windows: 6 PM - 9 PM direct bookings. Keep premium rooms visible for same-day upsell.</p>
           </div>
           <div className="flex gap-2.5">
             <div className="hero-chip rounded-xl px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/85">Confirmed</p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Confirmed</p>
               <p className="text-base font-semibold">{reservations.filter((r) => r.status === 'Confirmed').length}</p>
             </div>
             <div className="hero-chip rounded-xl px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/85">Pending</p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Pending</p>
               <p className="text-base font-semibold">{reservations.filter((r) => r.status === 'Pending').length}</p>
             </div>
           </div>
@@ -310,7 +310,7 @@ export function Reservations() {
                   <tr><td className="px-6 py-8 text-slate-500" colSpan={8}>No reservations found.</td></tr>
                 ) : visible.map((booking) => (
                   <tr key={booking.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-6 py-4 font-medium text-amber-600"><div className="table-truncate">{booking.id}</div></td>
+                    <td className="px-6 py-4 font-medium text-slate-400 text-xs font-mono"><div className="table-truncate">{booking.id}</div></td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900 table-truncate">{booking.guest}</div>
                       <div className="text-xs text-gray-500 table-truncate">{booking.email}</div>
@@ -369,7 +369,7 @@ export function Reservations() {
         </div>
       ) : (
         <div className="luxury-panel luxury-panel-spotlight rounded-2xl p-8 flex flex-col items-center justify-center text-center h-96">
-          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mb-4 text-amber-600">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
             <CalendarIcon className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>

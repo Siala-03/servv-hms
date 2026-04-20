@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Brain, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2,
-  Zap, BarChart3, DollarSign, AlertTriangle, Lightbulb, CheckCircle2, Sparkles,
+  Zap, BarChart3, Banknote, AlertTriangle, Lightbulb, CheckCircle2, Sparkles,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -48,7 +48,7 @@ const SIGNAL_META = {
 };
 
 const CATEGORY_META: Record<string, { icon: typeof Zap; color: string }> = {
-  Revenue:          { icon: DollarSign,  color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  Revenue:          { icon: Banknote,    color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
   Operations:       { icon: Zap,         color: 'text-amber-600 bg-amber-50 border-amber-200'       },
   'Guest Experience': { icon: Sparkles,  color: 'text-purple-600 bg-purple-50 border-purple-200'   },
   'Action Today':   { icon: CheckCircle2, color: 'text-blue-600 bg-blue-50 border-blue-200'         },
@@ -63,7 +63,7 @@ function fmtDay(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usd = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ export function Intelligence() {
       <section className="hero-banner p-6 sm:p-7 mb-8 text-slate-100">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/90 font-semibold mb-2">30-Day Intelligence View</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">30-Day Intelligence View</p>
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] mb-2">Smart Hospitality Dashboard</h2>
             <p className="text-sm text-slate-300 max-w-2xl">
               {loadingData ? 'Loading forecast data…' : `${avgOccupancy}% avg projected occupancy · ${surgeRecs} room type${surgeRecs !== 1 ? 's' : ''} ready for rate increase`}
@@ -137,15 +137,15 @@ export function Intelligence() {
           </div>
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3 min-w-[300px]">
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Avg Occ.</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Avg Occ.</p>
               <p className="text-lg font-semibold">{loadingData ? '—' : `${avgOccupancy}%`}</p>
             </div>
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Wknd Avg</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Wknd Avg</p>
               <p className="text-lg font-semibold">{loadingData ? '—' : `${weekendAvg}%`}</p>
             </div>
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Peak Day</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Peak Day</p>
               <p className="text-lg font-semibold">{loadingData || !peakDay ? '—' : `${peakDay.occupancyRate}%`}</p>
             </div>
           </div>
@@ -181,8 +181,8 @@ export function Intelligence() {
                 />
                 <ReferenceLine y={80} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: '80% full', fill: '#ef4444', fontSize: 10, position: 'right' }} />
                 <ReferenceLine y={50} stroke="#6b7280" strokeDasharray="4 4" strokeWidth={1} />
-                <Area type="monotone" dataKey="occupancyRate" stroke="#f59e0b" strokeWidth={2.5}
-                  fill="#fde68a" dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} />
+                <Area type="monotone" dataKey="occupancyRate" stroke="#d97706" strokeWidth={2}
+                  fill="#fef3c7" fillOpacity={0.5} dot={false} activeDot={{ r: 4, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}

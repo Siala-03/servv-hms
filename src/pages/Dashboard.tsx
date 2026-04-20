@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { BedDouble, DollarSign, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight } from 'lucide-react';
+import { BedDouble, Banknote, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { PageHeader } from '../components/PageHeader';
 import { StatsCard } from '../components/StatsCard';
@@ -23,7 +23,7 @@ interface ApiRes {
 interface ApiRoom { id: string; status: string; }
 interface ApiTask { id: string; status: string; notes?: string; room?: { roomNumber: string } | null; createdAt: string; }
 
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usd = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 function isoToday() { return new Date().toISOString().split('T')[0]; }
 
@@ -118,7 +118,7 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => navigate('/reservations?new=1')}
-              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm">
+              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm">
               <Plus className="w-4 h-4" /> New Booking
             </button>
           </>
@@ -151,7 +151,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard title="Occupancy Rate"       value={loading ? '—' : `${occupancy}%`}        icon={BedDouble}    color="amber" />
-        <StatsCard title="Revenue (Checked-in)" value={loading ? '—' : usd.format(todayRevenue)} icon={DollarSign}   color="emerald" />
+        <StatsCard title="Revenue (Checked-in)" value={loading ? '—' : usd.format(todayRevenue)} icon={Banknote}    color="emerald" />
         <StatsCard title="Average Daily Rate"   value={loading ? '—' : usd.format(adr)}          icon={TrendingUp}   color="purple" />
         <StatsCard title="Pending Check-ins"    value={loading ? '—' : String(pendingCI)}         icon={CalendarCheck} color="amber" />
       </div>

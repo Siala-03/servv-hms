@@ -115,7 +115,7 @@ export function ServvIQ() {
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${
           open
             ? 'bg-slate-800 hover:bg-slate-900 rotate-0'
-            : 'bg-slate-900 hover:bg-slate-800'
+            : 'bg-amber-600 hover:bg-amber-700'
         }`}
         title="Servv IQ — AI Assistant"
       >
@@ -197,7 +197,7 @@ export function ServvIQ() {
           <button
             onClick={() => send()}
             disabled={!input.trim() || loading}
-            className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-700 flex items-center justify-center transition-colors disabled:opacity-40 shrink-0"
+            className="w-9 h-9 rounded-xl bg-amber-600 hover:bg-amber-700 flex items-center justify-center transition-colors disabled:opacity-40 shrink-0"
           >
             {loading
               ? <Loader2 className="w-4 h-4 text-white animate-spin" />

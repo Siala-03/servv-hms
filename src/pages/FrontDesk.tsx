@@ -13,8 +13,8 @@ interface DepartureRow { id: string; name: string; room: string; checkOutDate: s
 
 const statusColor: Record<string, string> = {
   Available:   'bg-emerald-100 border-emerald-200 text-emerald-800',
-  Occupied:    'bg-amber-100 border-amber-200 text-amber-800',
-  Cleaning:    'bg-amber-100 border-amber-200 text-amber-800',
+  Occupied:    'bg-amber-50 border-amber-200 text-amber-700',
+  Cleaning:    'bg-amber-50 border-amber-200 text-amber-700',
   Maintenance: 'bg-red-100 border-red-200 text-red-800',
   Reserved:    'bg-purple-100 border-purple-200 text-purple-800',
 };

@@ -73,8 +73,8 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? 'bg-slate-800/90 text-white border border-white/10'
-                    : 'border border-transparent hover:bg-slate-800/55 hover:text-white hover:border-slate-700/80'
+                    ? 'bg-amber-500/10 text-white border border-amber-500/25'
+                    : 'border border-transparent hover:bg-white/5 hover:text-white hover:border-white/8'
                 }`
               }
             >
