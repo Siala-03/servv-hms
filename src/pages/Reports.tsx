@@ -46,21 +46,29 @@ export function Reports() {
   const [reservations, setReservations] = useState<ApiRes[]>([]);
   const [rooms,        setRooms]        = useState<ApiRoom[]>([]);
   const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
   const [range,        setRange]        = useState<Range>('6m');
 
   useEffect(() => {
+    setLoading(true);
+    setError('');
     Promise.all([
       api.get<ApiRes[]>('/api/reservations'),
       api.get<ApiRoom[]>('/api/rooms'),
     ])
       .then(([r, rm]) => { setReservations(r); setRooms(rm); })
-      .catch(() => {})
+      .catch((e) => setError(e?.message ?? 'Failed to load analytics data.'))
       .finally(() => setLoading(false));
   }, []);
 
   const cutoff      = startOf(range);
   const totalRooms  = rooms.length;
-  const filtered    = reservations.filter((r) => r.status !== 'Cancelled' && new Date(r.createdAt) >= cutoff);
+  // Filter by checkInDate so seed/historical data is not hidden by booking-creation cutoff
+  const filtered    = reservations.filter((r) => {
+    if (r.status === 'Cancelled') return false;
+    const ci = r.checkInDate ? new Date(r.checkInDate.slice(0, 10)) : new Date(r.createdAt);
+    return ci >= cutoff;
+  });
 
   // ── Monthly trend data ──────────────────────────────────────────────────────
   const monthsToShow = range === '6m' ? 6 : range === 'ytd' ? new Date().getMonth() + 1 : 12;
@@ -71,15 +79,22 @@ export function Reports() {
     const m = d.getMonth();
     const monthStart = new Date(y, m, 1);
     const monthEnd   = new Date(y, m + 1, 1);
-    const key        = `${y}-${String(m + 1).padStart(2, '0')}`;
 
+    // Revenue: booked stays whose check-in falls in this month
     const revenue = reservations
-      .filter((r) => r.status !== 'Cancelled' && new Date(r.createdAt) >= monthStart && new Date(r.createdAt) < monthEnd)
+      .filter((r) => {
+        if (r.status === 'Cancelled') return false;
+        const ci = new Date(r.checkInDate?.slice(0, 10) ?? r.createdAt);
+        return ci >= monthStart && ci < monthEnd;
+      })
       .reduce((s, r) => s + (r.totalAmount ?? 0), 0);
 
+    // Occupancy: reservations overlapping this month
     const stayCount = reservations.filter((r) => {
-      if (!['Checked-in','Checked-out','Confirmed'].includes(r.status)) return false;
-      return r.checkInDate < key + '-32' && r.checkOutDate > key + '-01';
+      if (!['Checked-in', 'Checked-out', 'Confirmed'].includes(r.status)) return false;
+      const ci = new Date(r.checkInDate?.slice(0, 10) ?? '9999-01-01');
+      const co = new Date(r.checkOutDate?.slice(0, 10) ?? '0000-01-01');
+      return ci < monthEnd && co > monthStart;
     }).length;
 
     const occupancy = totalRooms > 0 ? Math.min(Math.round((stayCount / totalRooms) * 100), 100) : 0;
@@ -115,8 +130,9 @@ export function Reports() {
     : 0;
   const avgLos = filtered.length
     ? filtered.reduce((s, r) => {
-        const nights = Math.max(1, (new Date(r.checkOutDate).getTime() - new Date(r.checkInDate).getTime()) / 86400000);
-        return s + nights;
+        const ci = new Date(r.checkInDate?.slice(0, 10)  ?? r.createdAt);
+        const co = new Date(r.checkOutDate?.slice(0, 10) ?? r.createdAt);
+        return s + Math.max(1, (co.getTime() - ci.getTime()) / 86400000);
       }, 0) / filtered.length
     : 0;
 
@@ -160,6 +176,12 @@ export function Reports() {
           </>
         }
       />
+
+      {error && (
+        <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
