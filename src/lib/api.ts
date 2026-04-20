@@ -47,13 +47,41 @@ async function request<T>(
     ...init,
   });
 
+  const contentType = res.headers.get('content-type') ?? '';
+  const isJsonResponse = contentType.includes('application/json');
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+    let message = `HTTP ${res.status}`;
+
+    if (isJsonResponse) {
+      const body = await res.json().catch(() => ({} as { error?: string; message?: string }));
+      message = body.error ?? body.message ?? message;
+    } else {
+      const text = (await res.text()).trim();
+      if (text) message = text;
+    }
+
+    throw new Error(message);
   }
 
   if (res.status === 204) return undefined as unknown as T;
-  return res.json() as Promise<T>;
+
+  if (isJsonResponse) {
+    return res.json() as Promise<T>;
+  }
+
+  const text = (await res.text()).trim();
+  if (!text) return undefined as unknown as T;
+
+  if (text.toLowerCase().startsWith('blocked')) {
+    throw new Error(`Request blocked by upstream. Check CORS allowlist and VITE_API_URL. Server says: ${text}`);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Expected JSON but received non-JSON response: ${text.slice(0, 140)}`);
+  }
 }
 
 export const api = {
