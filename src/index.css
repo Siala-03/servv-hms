@@ -11,6 +11,7 @@
 :root {
   --brand-amber-500: #f59e0b;
   --brand-amber-600: #d97706;
+  --brand-amber-700: #b45309;
   --brand-slate-950: #020617;
   --surface-base: #f7f9fc;
   --surface-card: #ffffff;
@@ -37,6 +38,17 @@ body {
   letter-spacing: 0.01em;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.16) 0.6px, transparent 0.6px);
+  background-size: 18px 18px;
+  opacity: 0.2;
+  z-index: -1;
+}
+
 h1,
 h2,
 h3 {
@@ -54,6 +66,63 @@ h3 {
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 14px 40px -28px rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(5px);
+}
+
+.luxury-panel-spotlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.luxury-panel-spotlight::after {
+  content: '';
+  position: absolute;
+  inset: -40% auto auto -15%;
+  width: 300px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0) 72%);
+  pointer-events: none;
+}
+
+.brand-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0.24) 50%, rgba(255, 255, 255, 0) 65%);
+  transform: translateX(-130%);
+  transition: transform 480ms ease;
+}
+
+.brand-btn:hover::before {
+  transform: translateX(130%);
+}
+
+.hero-banner {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  background:
+    radial-gradient(720px 260px at 0% 0%, rgba(245, 158, 11, 0.2), transparent 56%),
+    radial-gradient(620px 240px at 100% 100%, rgba(15, 23, 42, 0.12), transparent 52%),
+    linear-gradient(135deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.93) 100%);
+  box-shadow: 0 22px 40px -28px rgba(2, 6, 23, 0.85);
+}
+
+.hero-chip {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(15, 23, 42, 0.45);
+  color: #f8fafc;
+}
+
+.headline-accent {
+  background: linear-gradient(110deg, #0f172a 5%, #f59e0b 55%, #b45309 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .focus-ring {

@@ -197,7 +197,7 @@ export function Reservations() {
             </button>
             <button
               onClick={() => { setFormData(emptyForm()); setFormError(''); setShowNew(true); }}
-              className="focus-ring flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25"
+              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25"
             >
               <Plus className="w-4 h-4" /> New Booking
             </button>
@@ -205,8 +205,27 @@ export function Reservations() {
         }
       />
 
+      <section className="hero-banner p-5 sm:p-6 mb-6 text-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/90 font-semibold mb-1.5">Reservation Flow</p>
+            <p className="text-sm text-slate-200">High conversion windows: 6 PM - 9 PM direct bookings. Keep premium rooms visible for same-day upsell.</p>
+          </div>
+          <div className="flex gap-2.5">
+            <div className="hero-chip rounded-xl px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/85">Confirmed</p>
+              <p className="text-base font-semibold">{reservations.filter((r) => r.status === 'Confirmed').length}</p>
+            </div>
+            <div className="hero-chip rounded-xl px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/85">Pending</p>
+              <p className="text-base font-semibold">{reservations.filter((r) => r.status === 'Pending').length}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Filters */}
-      <div className="luxury-panel p-4 rounded-2xl mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+      <div className="luxury-panel luxury-panel-spotlight p-4 rounded-2xl mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -320,7 +339,7 @@ export function Reservations() {
           </div>
         </div>
       ) : (
-        <div className="luxury-panel rounded-2xl p-8 flex flex-col items-center justify-center text-center h-96">
+        <div className="luxury-panel luxury-panel-spotlight rounded-2xl p-8 flex flex-col items-center justify-center text-center h-96">
           <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mb-4 text-amber-600">
             <CalendarIcon className="w-8 h-8" />
           </div>

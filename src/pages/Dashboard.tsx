@@ -178,16 +178,40 @@ export function Dashboard() {
         subtitle="Welcome back, John. Here's what's happening today."
         actions={
         <>
-            <button className="focus-ring flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm">
+            <button className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm">
               <UserPlus className="w-4 h-4" />
               Walk-in
             </button>
-            <button className="focus-ring flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25">
+            <button className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25">
               <Plus className="w-4 h-4" />
               New Booking
             </button>
           </>
         } />
+
+      <section className="hero-banner p-6 sm:p-7 mb-8 text-slate-100">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/90 font-semibold mb-2">Today at a Glance</p>
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] mb-2">Paramount Hotel Kigali is running at peak rhythm.</h2>
+            <p className="text-sm text-slate-300 max-w-2xl">Front desk, housekeeping, and bookings are synced. Focus your team on late arrivals and premium upsells in the next two hours.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 min-w-[300px]">
+            <div className="hero-chip rounded-xl px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Arrivals</p>
+              <p className="text-lg font-semibold">14</p>
+            </div>
+            <div className="hero-chip rounded-xl px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Turnovers</p>
+              <p className="text-lg font-semibold">9</p>
+            </div>
+            <div className="hero-chip rounded-xl px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Upsell</p>
+              <p className="text-lg font-semibold">$1.2k</p>
+            </div>
+          </div>
+        </div>
+      </section>
       
 
       {/* Stats Grid */}
@@ -226,7 +250,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Occupancy Chart */}
-        <div className="luxury-panel p-6 rounded-2xl lg:col-span-2">
+        <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-slate-900">
               Occupancy Trend
@@ -299,7 +323,7 @@ export function Dashboard() {
         </div>
 
         {/* Channel Mix */}
-        <div className="luxury-panel p-6 rounded-2xl">
+        <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl">
           <h3 className="text-lg font-semibold text-slate-900 mb-6">
             Revenue by Channel
           </h3>
@@ -336,7 +360,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Bookings Table */}
-        <div className="luxury-panel rounded-2xl lg:col-span-2 overflow-hidden">
+        <div className="luxury-panel luxury-panel-spotlight rounded-2xl lg:col-span-2 overflow-hidden">
           <div className="p-6 border-b border-slate-200/80 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-900">
               Recent Bookings
@@ -389,7 +413,7 @@ export function Dashboard() {
         </div>
 
         {/* Activity Feed */}
-        <div className="luxury-panel rounded-2xl">
+        <div className="luxury-panel luxury-panel-spotlight rounded-2xl">
           <div className="p-6 border-b border-slate-200/80">
             <h3 className="text-lg font-semibold text-slate-900">
               Today's Activity

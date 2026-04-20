@@ -22,8 +22,10 @@ export function StatsCard({
   trendLabel,
   color = 'amber'
 }: StatsCardProps) {
+  const trendWidth = trend !== undefined ? Math.min(Math.max(Math.abs(trend) * 6, 12), 84) : 0;
+
   return (
-    <div className="luxury-panel rounded-2xl p-6 transition-all duration-250 hover:-translate-y-0.5 hover:shadow-[0_18px_35px_-26px_rgba(15,23,42,0.65)]">
+    <div className="luxury-panel luxury-panel-spotlight rounded-2xl p-6 transition-all duration-250 hover:-translate-y-0.5 hover:shadow-[0_22px_38px_-26px_rgba(15,23,42,0.75)]">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-[0.78rem] font-semibold text-slate-500 mb-1 uppercase tracking-[0.11em]">{title}</p>
@@ -51,6 +53,15 @@ export function StatsCard({
         }
         </div>
       }
+
+      {trend !== undefined && (
+        <div className="mt-4 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className={`h-full rounded-full ${trend >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}
+            style={{ width: `${trendWidth}px` }}
+          />
+        </div>
+      )}
     </div>);
 
 }
