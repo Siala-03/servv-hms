@@ -56,6 +56,7 @@ export function SuperAdminPage() {
   const [form,         setForm]        = useState(EMPTY_FORM);
   const [saving,       setSaving]      = useState(false);
   const [formError,    setFormError]   = useState('');
+  const [createdHotel, setCreatedHotel]= useState<{ id: string; name: string; managerUsername?: string } | null>(null);
   const [viewHotel,    setViewHotel]   = useState<HotelAccount | null>(null);
   const [hotelUsers,   setHotelUsers]  = useState<HotelUser[]>([]);
   const [loadingUsers, setLoadingUsers]= useState(false);
@@ -101,9 +102,9 @@ export function SuperAdminPage() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
-      toast('Hotel created successfully', 'success');
       setCreateModal(false);
       setForm(EMPTY_FORM);
+      setCreatedHotel({ id: data.id, name: data.name, managerUsername: data.manager?.username });
       await load();
     } catch (err: any) {
       setFormError(err.message);
@@ -422,6 +423,39 @@ export function SuperAdminPage() {
           )}
           {formError && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl px-3 py-2">{formError}</p>}
         </form>
+      </Modal>
+
+      {/* Hotel Created — show ID */}
+      <Modal
+        title="Hotel Created"
+        open={!!createdHotel}
+        onClose={() => setCreatedHotel(null)}
+        footer={
+          <button onClick={() => setCreatedHotel(null)}
+            className="px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700">
+            Done
+          </button>
+        }
+      >
+        {createdHotel && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+              <p className="text-sm font-medium text-emerald-800"><strong>{createdHotel.name}</strong> created successfully.</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex flex-col gap-1">
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Hotel ID</p>
+              <p className="font-mono font-bold text-slate-900 text-sm break-all">{createdHotel.id}</p>
+              <p className="text-xs text-slate-400 mt-1">Share this ID with the manager — they need it to log in.</p>
+            </div>
+            {createdHotel.managerUsername && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col gap-1">
+                <p className="text-xs text-amber-700 font-medium uppercase tracking-wide">Manager Username</p>
+                <p className="font-mono font-bold text-amber-900">{createdHotel.managerUsername}</p>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog
