@@ -118,7 +118,7 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => navigate('/reservations?new=1')}
-              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25">
+              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm">
               <Plus className="w-4 h-4" /> New Booking
             </button>
           </>
@@ -128,21 +128,21 @@ export function Dashboard() {
       <section className="hero-banner p-6 sm:p-7 mb-8 text-slate-100">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/90 font-semibold mb-2">Today at a Glance</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Today at a Glance</p>
             <h2 className="text-2xl sm:text-3xl font-semibold tracking-[-0.02em] mb-2">{user?.hotelName ?? 'Your hotel'} — live status</h2>
             <p className="text-sm text-slate-300 max-w-2xl">{loading ? 'Loading today\'s data…' : `${arrivalsToday.length} arrival${arrivalsToday.length !== 1 ? 's' : ''} expected today, ${departuresToday.length} departure${departuresToday.length !== 1 ? 's' : ''} scheduled.`}</p>
           </div>
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3 min-w-[300px]">
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Arrivals</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Arrivals</p>
               <p className="text-lg font-semibold">{loading ? '—' : arrivalsToday.length}</p>
             </div>
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Departures</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Departures</p>
               <p className="text-lg font-semibold">{loading ? '—' : departuresToday.length}</p>
             </div>
             <div className="hero-chip rounded-xl px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-100/85">Tasks</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Tasks</p>
               <p className="text-lg font-semibold">{loading ? '—' : tasks.filter((t) => t.status === 'Open').length}</p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export function Dashboard() {
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
                 <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(v: number) => [`${v}%`, 'Occupancy']} />
-                <Area type="monotone" dataKey="rate" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="#fde68a" />
+                <Area type="monotone" dataKey="rate" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="#f1f5f9" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -198,7 +198,7 @@ export function Dashboard() {
         <div className="luxury-panel luxury-panel-spotlight rounded-2xl lg:col-span-2 overflow-hidden">
           <div className="p-6 border-b border-slate-200/80 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-900">Recent Bookings</h3>
-            <button onClick={() => navigate('/reservations')} className="text-sm text-amber-600 font-medium hover:text-amber-700 flex items-center gap-1">
+            <button onClick={() => navigate('/reservations')} className="text-sm text-slate-600 font-medium hover:text-slate-900 flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -247,7 +247,7 @@ export function Dashboard() {
                 {activity.map((a, i) => (
                   <div key={a.id} className="flex gap-4 relative">
                     {i !== activity.length - 1 && <div className="absolute left-4 top-8 bottom-[-24px] w-px bg-slate-200" />}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${a.type === 'check-in' ? 'bg-emerald-100 text-emerald-600' : a.type === 'check-out' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${a.type === 'check-in' ? 'bg-emerald-100 text-emerald-600' : a.type === 'check-out' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
                       <Bell className="w-4 h-4" />
                     </div>
                     <div>

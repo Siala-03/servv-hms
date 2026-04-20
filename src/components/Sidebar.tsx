@@ -49,7 +49,6 @@ export function Sidebar() {
 
   return (
     <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
-      <div className="absolute inset-0 pointer-events-none bg-amber-500/5" />
 
       <div className="relative p-6 pb-4 flex items-center gap-3 border-b border-slate-800/80">
         <div className="w-24 sm:w-28 shrink-0 flex items-center">
@@ -74,7 +73,7 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? 'bg-slate-800/90 text-white border border-amber-500/35 shadow-[0_10px_25px_-20px_rgba(245,158,11,0.95)]'
+                    ? 'bg-slate-800/90 text-white border border-white/10'
                     : 'border border-transparent hover:bg-slate-800/55 hover:text-white hover:border-slate-700/80'
                 }`
               }
@@ -90,7 +89,7 @@ export function Sidebar() {
 
       <div className="relative p-4 border-t border-slate-800/80">
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-900/55 border border-slate-800">
-          <div className="w-8 h-8 rounded-full bg-amber-700/80 flex items-center justify-center text-white font-semibold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-semibold text-xs shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
