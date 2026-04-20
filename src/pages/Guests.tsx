@@ -40,6 +40,21 @@ export function Guests() {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [actionBusy, setActionBusy]     = useState(false);
 
+  // Notes modal
+  const [noteTarget, setNoteTarget]       = useState<TaskRow | null>(null);
+  const [noteText, setNoteText]           = useState('');
+  const [noteSaving, setNoteSaving]       = useState(false);
+
+  async function handleSaveNote() {
+    if (!noteTarget) return;
+    setNoteSaving(true);
+    try {
+      await updateHousekeepingTask(noteTarget.id, { notes: noteText.trim() || undefined });
+      setNoteTarget(null);
+      reloadTasks();
+    } finally { setNoteSaving(false); }
+  }
+
   // Guest form
   const [showForm, setShowForm]           = useState(false);
   const [editing, setEditing]             = useState<GuestProfile | null>(null);
@@ -204,7 +219,11 @@ export function Guests() {
                         className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                       >Resolve</button>
                     )}
-                    <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                    <button
+                      onClick={() => { setNoteTarget(task); setNoteText(task.notes ?? ''); }}
+                      title="Add / view note"
+                      className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
                       <MessageSquare className="w-4 h-4" />
                     </button>
                   </div>
@@ -345,6 +364,38 @@ export function Guests() {
                 <option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option>
               </select>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Notes Modal ────────────────────────────────────────── */}
+      {noteTarget && (
+        <Modal
+          title={`Note — Room ${noteTarget.room?.roomNumber ?? noteTarget.roomId}`}
+          onClose={() => setNoteTarget(null)}
+          size="sm"
+          footer={
+            <>
+              <button onClick={() => setNoteTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium">Cancel</button>
+              <button onClick={handleSaveNote} disabled={noteSaving} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50">
+                {noteSaving ? 'Saving…' : 'Save Note'}
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Note / Instructions</label>
+            <textarea
+              rows={4}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add a note for this task…"
+              className={inputCls + ' resize-none'}
+              autoFocus
+            />
+            <p className="text-xs text-slate-400 mt-1.5">
+              {noteTarget.room?.roomType ?? 'Housekeeping'} · {noteTarget.status} · {noteTarget.priority}
+            </p>
           </div>
         </Modal>
       )}
