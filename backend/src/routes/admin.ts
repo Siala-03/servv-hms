@@ -190,12 +190,13 @@ router.post('/hotels', authenticate, requireRole('superadmin'), async (_req: Aut
 
       if (userErr) throw new HttpError(500, userErr.message);
 
-      await supabase.from('hotel_user_credentials').insert({
+      const { error: credErr } = await supabase.from('hotel_user_credentials').insert({
         user_id:       user.id,
         hotel_id:      hotel.id,
         username:      (managerUsername as string).trim(),
         password_hash: hash,
       });
+      if (credErr) throw new HttpError(500, credErr.message);
 
       manager = { id: user.id, firstName: user.first_name, username: managerUsername };
     }
@@ -307,6 +308,30 @@ router.post('/hotels/:id/manager', authenticate, requireRole('superadmin'), asyn
         hotelName: hotel.name,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── PUT /api/admin/users/:id/password ────────────────────────────────────────
+// Superadmin resets any user's password (also upserts credentials if missing)
+router.put('/users/:id/password', authenticate, requireRole('superadmin'), async (req, res, next) => {
+  try {
+    const { password } = req.body as { password: string };
+    if (!password || password.length < 6) throw new HttpError(400, 'Password must be at least 6 characters');
+
+    const { data: user } = await supabase
+      .from('hotel_users').select('id, hotel_id').eq('id', req.params.id).maybeSingle();
+    if (!user) throw new HttpError(404, 'User not found');
+
+    const hash = await bcrypt.hash(password, 10);
+
+    // Upsert so this also fixes users whose credential row is missing
+    const { error } = await supabase.from('hotel_user_credentials')
+      .upsert({ user_id: user.id, hotel_id: user.hotel_id, password_hash: hash }, { onConflict: 'user_id' });
+    if (error) throw new HttpError(500, error.message);
+
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

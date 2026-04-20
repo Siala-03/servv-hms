@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Plus, Hotel, Users, TrendingUp, Edit2, Trash2,
-  CheckCircle2, XCircle, Loader2, ChevronLeft, Utensils,
+  CheckCircle2, XCircle, Loader2, ChevronLeft, Utensils, KeyRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -62,6 +62,8 @@ export function SuperAdminPage() {
   const [loadingUsers, setLoadingUsers]= useState(false);
   const [mgrModal,     setMgrModal]    = useState<HotelAccount | null>(null);
   const [mgrForm,      setMgrForm]     = useState({ firstName: '', lastName: '', email: '', phone: '', username: '', password: '' });
+  const [resetPwUser,  setResetPwUser] = useState<HotelUser | null>(null);
+  const [newPassword,  setNewPassword] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -186,6 +188,26 @@ export function SuperAdminPage() {
       await load();
     } catch (err: any) {
       setFormError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetPwUser || newPassword.length < 6) return;
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/api/admin/users/${resetPwUser.id}/password`, {
+        method: 'PUT', headers: authHeaders(), body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      toast('Password reset successfully', 'success');
+      setResetPwUser(null);
+      setNewPassword('');
+    } catch (err: any) {
+      toast(err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -318,7 +340,7 @@ export function SuperAdminPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {['Name', 'Username', 'Role', 'Status'].map((h) => (
+                  {['Name', 'Username', 'Role', 'Status', ''].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -337,6 +359,12 @@ export function SuperAdminPage() {
                       {u.is_active
                         ? <span className="text-xs text-emerald-600 font-medium">Active</span>
                         : <span className="text-xs text-slate-400">Inactive</span>}
+                    </td>
+                    <td className="px-5 py-3">
+                      <button onClick={() => { setResetPwUser(u); setNewPassword(''); }}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-amber-600 transition-colors" title="Reset password">
+                        <KeyRound className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -422,6 +450,23 @@ export function SuperAdminPage() {
             </div>
           )}
           {formError && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl px-3 py-2">{formError}</p>}
+        </form>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        title={`Reset Password — ${resetPwUser?.first_name ?? ''} ${resetPwUser?.last_name ?? ''}`}
+        open={!!resetPwUser}
+        onClose={() => { setResetPwUser(null); setNewPassword(''); }}
+        footer={
+          <button onClick={handleResetPassword as any} disabled={saving || newPassword.length < 6}
+            className="px-5 py-2.5 bg-amber-600 text-white text-sm font-semibold rounded-xl hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Reset Password
+          </button>
+        }
+      >
+        <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+          <FieldInput label="New password (min 6 chars)" value={newPassword} onChange={setNewPassword} type="password" />
         </form>
       </Modal>
 
