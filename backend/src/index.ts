@@ -48,6 +48,7 @@ const PUBLIC_PREFIXES = [
   '/api/admin/setup',
   '/api/public',
   '/api/webhook',
+  '/api/whatsapp/test',
   '/health',
 ];
 
