@@ -23,7 +23,6 @@ import { SuperAdminPage } from './pages/SuperAdminPage';
 import { UsersPage }      from './pages/UsersPage';
 import { Intelligence }   from './pages/Intelligence';
 import { GuestRoomPage }  from './pages/GuestRoomPage';
-import { RoomCalendar }   from './pages/RoomCalendar';
 
 function Unauthorized() {
   return (
@@ -68,7 +67,6 @@ export function App() {
               <Route index                element={<Navigate to="/login" replace />} />
               <Route path="dashboard"    element={<Dashboard />} />
               <Route path="reservations"  element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-              <Route path="calendar"      element={<ProtectedRoute><RoomCalendar /></ProtectedRoute>} />
               <Route path="channels"      element={<ProtectedRoute><ChannelManager /></ProtectedRoute>} />
               <Route path="front-desk"    element={<ProtectedRoute><FrontDesk /></ProtectedRoute>} />
               <Route path="guests"        element={<ProtectedRoute><Guests /></ProtectedRoute>} />

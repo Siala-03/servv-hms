@@ -46,7 +46,6 @@ function toReservation(row: Record<string, unknown>) {
       roomNumber: rm.room_number,
       roomType:   rm.room_type,
       floor:      rm.floor,
-      hotelId:    rm.hotel_id,
     } : null,
     ratePlan: rp ? {
       id:       rp.id,
@@ -60,7 +59,7 @@ function toReservation(row: Record<string, unknown>) {
 const JOIN_QUERY = `
   *,
   guests     ( id, first_name, last_name, email, phone ),
-  rooms      ( id, room_number, room_type, floor, hotel_id ),
+  rooms      ( id, room_number, room_type, floor ),
   rate_plans ( id, code, name, meal_plan )
 `;
 
@@ -137,12 +136,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       const amount     = currFmt.format(Number(r.totalAmount));
 
       // Fetch hotel info for ticket
-      const hotelId = rm ? String((rm as any).hotelId ?? '') : '';
-      const hotelQuery = hotelId
-        ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
-        : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
-
-      Promise.resolve(hotelQuery).then(({ data: hotel }) => {
+      Promise.resolve(
+        supabase.from('rooms').select('hotel_id').eq('id', String(b.roomId ?? '')).maybeSingle()
+      ).then(async ({ data: roomRow }) => {
+        const hotelId = roomRow?.hotel_id ?? '';
+        const hotelQuery = hotelId
+          ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
+          : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
+        const { data: hotel } = await Promise.resolve(hotelQuery);
         const h = hotel as Record<string, unknown> | null;
         const rp = r.ratePlan as Record<string, unknown> | null;
         const ticketData: TicketData = {
@@ -243,11 +244,6 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
           checkOut: String(r.checkOutDate),
         }).catch(() => {});
       } else if (status === 'Checked-out') {
-        const hotelId = rm ? String((rm as any).hotelId ?? '') : '';
-        const hotelQuery = hotelId
-          ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
-          : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
-
         Promise.resolve(
           supabase
             .from('folio_line_items')
@@ -262,7 +258,12 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
           const total = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
           const totalFmt = currFmt.format(total);
 
-          const { data: hotelRow } = await Promise.resolve(hotelQuery);
+          // Fetch hotel via room's hotel_id
+          const { data: roomRow } = await supabase.from('rooms').select('hotel_id').eq('id', String(r.roomId ?? '')).maybeSingle();
+          const hotelId = (roomRow as any)?.hotel_id ?? '';
+          const { data: hotelRow } = hotelId
+            ? await supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
+            : await supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
           const h = hotelRow as Record<string, unknown> | null;
 
           const receiptData: CheckoutReceiptData = {

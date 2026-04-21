@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, Download, Plus, Calendar as CalendarIcon, List, MoreVertical, X } from 'lucide-react';
+import { Search, Download, Plus, CalendarRange, List, MoreVertical, X } from 'lucide-react';
+import { RoomCalendar } from './RoomCalendar';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
@@ -215,12 +216,18 @@ export function Reservations() {
         subtitle="Manage all your bookings across channels in one place."
         actions={
           <>
-            <div className="flex bg-white rounded-lg border border-gray-200 p-1 mr-2">
-              <button onClick={() => setView('list')} className={`p-1.5 rounded-md transition-colors ${view === 'list' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
-                <List className="w-4 h-4" />
+            <div className="flex bg-white rounded-lg border border-slate-200 p-1 gap-0.5">
+              <button
+                onClick={() => setView('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'list' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <List className="w-3.5 h-3.5" /> List
               </button>
-              <button onClick={() => setView('calendar')} className={`p-1.5 rounded-md transition-colors ${view === 'calendar' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}>
-                <CalendarIcon className="w-4 h-4" />
+              <button
+                onClick={() => setView('calendar')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'calendar' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <CalendarRange className="w-3.5 h-3.5" /> Calendar
               </button>
             </div>
             <button
@@ -258,8 +265,8 @@ export function Reservations() {
         </div>
       </section>
 
-      {/* Filters */}
-      <div className="luxury-panel luxury-panel-spotlight p-4 rounded-2xl mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+      {/* Filters — hidden in calendar view */}
+      {view === 'list' && <div className="luxury-panel luxury-panel-spotlight p-4 rounded-2xl mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -288,9 +295,9 @@ export function Reservations() {
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
-      {/* Table */}
+      {/* Table / Calendar */}
       {view === 'list' ? (
         <div className="luxury-panel rounded-2xl overflow-hidden">
           {loadError && <div className="px-6 py-3 text-sm text-red-700 bg-red-50 border-b border-red-100">{loadError}</div>}
@@ -373,16 +380,7 @@ export function Reservations() {
           </div>
         </div>
       ) : (
-        <div className="luxury-panel luxury-panel-spotlight rounded-2xl p-8 flex flex-col items-center justify-center text-center h-96">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
-            <CalendarIcon className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Calendar View</h3>
-          <p className="text-gray-500 max-w-md">The interactive calendar view allows you to drag and drop bookings, see availability at a glance, and manage room assignments visually.</p>
-          <button onClick={() => setView('list')} className="focus-ring mt-6 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium border border-slate-200">
-            Switch back to List View
-          </button>
-        </div>
+        <RoomCalendar />
       )}
 
       {/* ── New Booking Modal ───────────────────────────────────── */}

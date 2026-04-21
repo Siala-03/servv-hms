@@ -58,7 +58,7 @@ export function Orders() {
   const [submitting, setSubmitting] = useState(false);
 
   // Reference data
-  const [reservations, setReservations] = useState<{ id: string; guest?: { firstName: string; lastName: string } | null }[]>([]);
+  const [reservations, setReservations] = useState<{ id: string; guestId?: string; guest?: { firstName: string; lastName: string } | null }[]>([]);
 
   function reload() {
     setIsLoading(true);
@@ -72,8 +72,9 @@ export function Orders() {
 
   useEffect(() => {
     if (!showNew) return;
-    api.get<{ id: string; guest?: { firstName: string; lastName: string } | null }[]>('/api/reservations')
-      .then(setReservations).catch(() => {});
+    api.get<{ id: string; guestId?: string; guest?: { firstName: string; lastName: string } | null }[]>('/api/reservations')
+      .then((data) => setReservations(data.filter((r) => r.guest)))
+      .catch(() => {});
   }, [showNew]);
 
   async function handleStatusChange(id: string, status: OrderStatus) {
@@ -179,20 +180,30 @@ export function Orders() {
                 value={form.reservationId}
                 onChange={(e) => {
                   const res = reservations.find((r) => r.id === e.target.value);
-                  setForm({ ...form, reservationId: e.target.value, requestedByGuestId: '' });
-                  void res;
+                  setForm({ ...form, reservationId: e.target.value, requestedByGuestId: res?.guestId ?? '' });
                 }}
                 className={inputCls}
               >
                 <option value="">Select reservation…</option>
                 {reservations.map((r) => (
-                  <option key={r.id} value={r.id}>{r.id}{r.guest ? ` – ${r.guest.firstName} ${r.guest.lastName}` : ''}</option>
+                  <option key={r.id} value={r.id}>
+                    {r.guest ? `${r.guest.firstName} ${r.guest.lastName}` : r.id}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Guest ID <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="gst-XXXX" value={form.requestedByGuestId} onChange={(e) => setForm({ ...form, requestedByGuestId: e.target.value })} className={inputCls} />
+              <label className="block text-xs font-medium text-slate-600 mb-1">Guest</label>
+              <input
+                type="text"
+                readOnly
+                value={
+                  reservations.find((r) => r.id === form.reservationId)?.guest
+                    ? `${reservations.find((r) => r.id === form.reservationId)!.guest!.firstName} ${reservations.find((r) => r.id === form.reservationId)!.guest!.lastName}`
+                    : form.requestedByGuestId || '—'
+                }
+                className={`${inputCls} bg-slate-50 text-slate-500 cursor-default`}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Department</label>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, CalendarDays, CalendarRange, Network, ConciergeBell,
+  LayoutDashboard, CalendarDays, Network, ConciergeBell,
   Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3,
   LogOut, ShieldCheck, UserCog, Brain,
 } from 'lucide-react';
@@ -12,7 +12,6 @@ import { BrandLogo } from './BrandLogo';
 const NAV_ITEMS = [
   { name: 'Dashboard',       path: '/dashboard',    icon: LayoutDashboard },
   { name: 'Reservations',    path: '/reservations', icon: CalendarDays    },
-  { name: 'Room Calendar',   path: '/calendar',     icon: CalendarRange   },
   { name: 'Channel Manager', path: '/channels',     icon: Network         },
   { name: 'Front Desk',      path: '/front-desk',   icon: ConciergeBell   },
   { name: 'Guests',          path: '/guests',       icon: Users           },
