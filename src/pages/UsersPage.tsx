@@ -10,8 +10,8 @@ import { API_BASE } from '../lib/api';
 const API = API_BASE;
 
 function authHeaders() {
-  const id = localStorage.getItem('servv_user_id');
-  return { 'Content-Type': 'application/json', ...(id ? { 'x-user-id': id } : {}) };
+  const token = localStorage.getItem('servv_auth_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 
 interface SystemUser {

@@ -66,8 +66,8 @@ async function request<T>(
     return { __queued: true } as unknown as T;
   }
 
-  const userId = localStorage.getItem('servv_user_id');
-  const authHeader: Record<string, string> = userId ? { 'x-user-id': userId } : {};
+  const authToken = localStorage.getItem('servv_auth_token');
+  const authHeader: Record<string, string> = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json', ...authHeader, ...(init?.headers ?? {}) },

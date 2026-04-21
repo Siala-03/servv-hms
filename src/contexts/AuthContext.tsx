@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { UserRole, ROLE_HOME } from '../lib/rbac';
 import { api } from '../lib/api';
 
+const AUTH_TOKEN_KEY = 'servv_auth_token';
+
 export interface AuthUser {
   id:            string;
   firstName:     string;
@@ -33,27 +35,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Verify stored session on mount
   useEffect(() => {
-    const storedId = localStorage.getItem('servv_user_id');
-    if (!storedId) { setLoading(false); return; }
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!storedToken) { setLoading(false); return; }
 
     api.get<{ user: AuthUser }>('/api/auth/me')
       .then(({ user: u }) => setUser(u))
-      .catch(() => { localStorage.removeItem('servv_user_id'); })
+      .catch(() => {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem('servv_user_id');
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (username: string, password: string, hotelId?: string) => {
-    const data = await api.post<{ user: AuthUser }>(
+    const data = await api.post<{ user: AuthUser; token: string }>(
       '/api/auth/login',
       { username, password, hotelId: hotelId || undefined },
       'Login',
     );
 
+    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
     localStorage.setItem('servv_user_id', data.user.id);
     setUser(data.user);
   }, []);
 
   const logout = useCallback(() => {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem('servv_user_id');
     setUser(null);
   }, []);

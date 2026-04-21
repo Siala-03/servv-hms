@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { supabase } from '../lib/supabase';
 import { HttpError } from '../lib/errors';
 import { authenticate, AuthRequest, requireRole } from '../middleware/authenticate';
+import { createAuthToken } from '../lib/authToken';
 
 const router = Router();
 
@@ -69,7 +70,13 @@ router.post('/login', async (req, res, next) => {
       hotel = data;
     }
 
-    res.json({ user: toUser(user, hotel) });
+    const authToken = createAuthToken({
+      userId: user.id,
+      role: user.role,
+      hotelId: user.hotel_id ?? null,
+    });
+
+    res.json({ user: toUser(user, hotel), token: authToken.token, expiresIn: authToken.expiresIn });
   } catch (err) {
     next(err);
   }
