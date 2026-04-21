@@ -449,22 +449,44 @@ async function handleConfirm(from: string, text: string, booking: BookingData) {
 
     const checkinUrl = `${FRONTEND}/checkin/${res.id}`;
 
+    // Fetch full room + hotel data for the ticket
+    const { data: roomRow } = await supabase
+      .from('rooms')
+      .select('floor, hotel_id, rate_plans(name, meal_plan)')
+      .eq('id', selectedRoom!.id)
+      .maybeSingle();
+
+    const roomFloor = roomRow ? String((roomRow as any).floor ?? '') : '';
+    const rp = roomRow && (roomRow as any).rate_plans;
+    const ratePlanName = rp ? String(rp.name ?? 'Standard') : 'Standard';
+    const mealPlan     = rp ? String(rp.meal_plan ?? '') : '';
+
+    const hotelId = roomRow ? String((roomRow as any).hotel_id ?? '') : '';
+    const { data: hotelRow } = hotelId
+      ? await supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
+      : await supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
+    const h = hotelRow as Record<string, unknown> | null;
+
     const ticketData: TicketData = {
-      bookingId:   res.id,
-      guestName:   `${firstName} ${lastName}`,
-      email:       email!,
+      bookingId:    res.id,
+      guestName:    `${firstName} ${lastName}`,
+      email:        email!,
       phone,
-      roomNumber:  selectedRoom!.roomNumber,
-      roomType:    selectedRoom!.roomType,
-      floor:       '',
-      ratePlan:    'Standard',
-      checkIn:     checkIn!,
-      checkOut:    checkOut!,
-      adults:      adults ?? 1,
-      totalAmount: String(selectedRoom!.totalPrice),
-      currency:    'USD',
+      roomNumber:   selectedRoom!.roomNumber,
+      roomType:     selectedRoom!.roomType,
+      floor:        roomFloor,
+      ratePlan:     ratePlanName,
+      mealPlan,
+      checkIn:      checkIn!,
+      checkOut:     checkOut!,
+      adults:       adults ?? 1,
+      totalAmount:  String(selectedRoom!.totalPrice),
+      currency:     'USD',
       checkinUrl,
-      hotelName:   HOTEL,
+      hotelName:    h ? String(h.name) : HOTEL,
+      hotelAddress: h ? String(h.address ?? '') : '',
+      hotelPhone:   h ? String(h.phone ?? '') : '',
+      hotelEmail:   h ? String(h.email ?? '') : '',
     };
 
     // Send ticket via WhatsApp

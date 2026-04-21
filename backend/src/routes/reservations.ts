@@ -45,20 +45,23 @@ function toReservation(row: Record<string, unknown>) {
       id:         rm.id,
       roomNumber: rm.room_number,
       roomType:   rm.room_type,
+      floor:      rm.floor,
+      hotelId:    rm.hotel_id,
     } : null,
     ratePlan: rp ? {
-      id:   rp.id,
-      code: rp.code,
-      name: rp.name,
+      id:       rp.id,
+      code:     rp.code,
+      name:     rp.name,
+      mealPlan: rp.meal_plan,
     } : null,
   };
 }
 
 const JOIN_QUERY = `
   *,
-  guests ( id, first_name, last_name, email, phone ),
-  rooms  ( id, room_number, room_type ),
-  rate_plans ( id, code, name )
+  guests     ( id, first_name, last_name, email, phone ),
+  rooms      ( id, room_number, room_type, floor, hotel_id ),
+  rate_plans ( id, code, name, meal_plan )
 `;
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
@@ -134,10 +137,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       const amount     = currFmt.format(Number(r.totalAmount));
 
       // Fetch hotel info for ticket
-      Promise.resolve(
-        supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single()
-      ).then(({ data: hotel }) => {
+      const hotelId = rm ? String((rm as any).hotelId ?? '') : '';
+      const hotelQuery = hotelId
+        ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
+        : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
+
+      Promise.resolve(hotelQuery).then(({ data: hotel }) => {
         const h = hotel as Record<string, unknown> | null;
+        const rp = r.ratePlan as Record<string, unknown> | null;
         const ticketData: TicketData = {
           bookingId:    String(r.id),
           guestName,
@@ -146,7 +153,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
           roomNumber:   rm ? String(rm.roomNumber) : '',
           roomType:     rm ? String(rm.roomType)   : '',
           floor:        rm ? String((rm as any).floor ?? '') : '',
-          ratePlan:     r.ratePlan ? String((r.ratePlan as any).name ?? 'Standard') : 'Standard',
+          ratePlan:     rp ? String(rp.name ?? 'Standard') : 'Standard',
+          mealPlan:     rp ? String(rp.mealPlan ?? '') : '',
           checkIn:      String(r.checkInDate),
           checkOut:     String(r.checkOutDate),
           adults:       Number(r.adults),

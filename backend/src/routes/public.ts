@@ -8,6 +8,8 @@ import {
   sendCheckinLink,
   sendText,
 } from '../services/whatsapp';
+import { sendBookingTicketEmail } from '../services/email';
+import { buildTicketText, TicketData } from '../services/ticket';
 
 const currFmt    = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
@@ -284,29 +286,53 @@ router.post('/book/:hotelId', async (req, res) => {
 
   if (resErr || !reservation) return res.status(500).json({ error: 'Failed to create reservation' });
 
-  // Send WhatsApp booking confirmation to guest
-  if (phone?.length > 5) {
-    const { data: roomRow } = await supabase
+  // Send full booking ticket via WhatsApp + email (fire-and-forget)
+  Promise.resolve(
+    supabase
       .from('rooms')
-      .select('room_number, room_type')
+      .select('room_number, room_type, floor, hotel_id, rate_plans(name, meal_plan)')
       .eq('id', roomId)
-      .single();
+      .single()
+  ).then(async ({ data: roomRow }) => {
+    const rm  = roomRow as Record<string, unknown> | null;
+    const rp  = rm ? (rm as any).rate_plans : null;
+    const hId = rm ? String((rm as any).hotel_id ?? '') : hotelId;
 
-    const rm = roomRow as Record<string, unknown> | null;
-    sendBookingConfirmation({
-      phone:      phone.trim(),
-      guestName:  `${firstName} ${lastName}`,
-      bookingId:  reservation.id,
-      roomNo:     rm ? String(rm.room_number) : '',
-      roomType:   rm ? String(rm.room_type)   : '',
-      checkIn:    checkIn,
-      checkOut:   checkOut,
-      adults:     adults ?? 1,
-      children:   children ?? 0,
-      amount:     currFmt.format(totalAmount ?? 0),
-      checkinUrl: `${FRONTEND_URL}/checkin/${reservation.id}`,
-    }).catch(() => {});
-  }
+    const { data: hotelRow } = await supabase
+      .from('hotel_accounts')
+      .select('name,address,phone,email')
+      .eq('id', hId)
+      .single();
+    const h = hotelRow as Record<string, unknown> | null;
+
+    const ticketData: TicketData = {
+      bookingId:    reservation.id,
+      guestName:    `${firstName.trim()} ${lastName.trim()}`,
+      email:        email.trim().toLowerCase(),
+      phone:        phone.trim(),
+      roomNumber:   rm ? String((rm as any).room_number) : '',
+      roomType:     rm ? String((rm as any).room_type)   : '',
+      floor:        rm ? String((rm as any).floor ?? '')  : '',
+      ratePlan:     rp ? String(rp.name ?? 'Standard')   : 'Standard',
+      mealPlan:     rp ? String(rp.meal_plan ?? '')       : '',
+      checkIn,
+      checkOut,
+      adults:       adults ?? 1,
+      children:     children ?? 0,
+      totalAmount:  currFmt.format(totalAmount ?? 0),
+      currency:     'USD',
+      checkinUrl:   `${FRONTEND_URL}/checkin/${reservation.id}`,
+      hotelName:    h ? String(h.name) : HOTEL_NAME,
+      hotelAddress: h ? String(h.address ?? '') : '',
+      hotelPhone:   h ? String(h.phone ?? '')   : '',
+      hotelEmail:   h ? String(h.email ?? '')   : '',
+    };
+
+    sendBookingTicketEmail(ticketData).catch(() => {});
+    if (phone?.trim().length > 5) {
+      sendText(phone.trim(), buildTicketText(ticketData)).catch(() => {});
+    }
+  }).catch(() => {});
 
   res.json({ bookingId: reservation.id });
 });

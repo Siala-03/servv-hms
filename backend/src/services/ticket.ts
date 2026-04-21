@@ -1,25 +1,28 @@
 // Generates the HTML booking ticket — used for email and PDF
 
 export interface TicketData {
-  bookingId:   string;
-  guestName:   string;
-  email:       string;
-  phone:       string;
-  roomNumber:  string;
-  roomType:    string;
-  floor:       number | string;
-  ratePlan:    string;
-  checkIn:     string;
-  checkOut:    string;
-  adults:      number;
-  children?:   number;
-  totalAmount: string;
-  currency:    string;
-  checkinUrl:  string;
-  hotelName:   string;
-  hotelAddress?: string;
-  hotelPhone?:   string;
-  hotelEmail?:   string;
+  bookingId:       string;
+  guestName:       string;
+  email:           string;
+  phone:           string;
+  roomNumber:      string;
+  roomType:        string;
+  floor:           number | string;
+  ratePlan:        string;
+  mealPlan?:       string;
+  checkIn:         string;
+  checkOut:        string;
+  adults:          number;
+  children?:       number;
+  totalAmount:     string;
+  currency:        string;
+  checkinUrl:      string;
+  hotelName:       string;
+  hotelAddress?:   string;
+  hotelPhone?:     string;
+  hotelEmail?:     string;
+  specialRequests?: string;
+  notes?:          string;
 }
 
 function fmtDate(iso: string) {
@@ -160,11 +163,18 @@ export function buildTicketHtml(d: TicketData): string {
         <label>Rate Plan</label>
         <span>${d.ratePlan}</span>
       </div>
+      ${d.mealPlan ? `<div class="field"><label>Meal Plan</label><span>${d.mealPlan}</span></div>` : ''}
       <div class="field">
         <label>Guests</label>
         <span>${d.adults} Adult${d.adults !== 1 ? 's' : ''}${child}</span>
       </div>
     </div>
+
+    ${(d.specialRequests || d.notes) ? `
+    <div class="guest-box" style="margin-bottom:20px;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#9ca3af;margin-bottom:6px;">Special Requests / Notes</div>
+      <div style="font-size:13px;color:#374151;line-height:1.6;">${d.specialRequests || d.notes}</div>
+    </div>` : ''}
 
     <hr class="divider" />
 
@@ -224,7 +234,7 @@ export function buildTicketText(d: TicketData): string {
     ``,
     `🛏 *Room ${d.roomNumber}* — ${d.roomType}`,
     `🏢 Floor ${d.floor}`,
-    `🍽 ${d.ratePlan}`,
+    `🍽 ${d.ratePlan}${d.mealPlan ? ` (${d.mealPlan})` : ''}`,
     `👥 ${d.adults} adult${d.adults !== 1 ? 's' : ''}${child}`,
     ``,
     `━━━━━━━━━━━━━━━━━━━━`,
@@ -236,6 +246,9 @@ export function buildTicketText(d: TicketData): string {
     ``,
     `_Reply to this message for assistance._`,
   ];
+  if (d.specialRequests || d.notes) {
+    lines.push(``, `📝 *Special Requests:* ${d.specialRequests || d.notes}`);
+  }
   if (d.hotelPhone)   lines.push(``, `📞 ${d.hotelPhone}`);
   if (d.hotelAddress) lines.push(`📍 ${d.hotelAddress}`);
   return lines.join('\n');
