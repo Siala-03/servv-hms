@@ -105,6 +105,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const b = req.body as Record<string, unknown>;
+
+    if (!b.checkInDate || !b.checkOutDate || String(b.checkOutDate) <= String(b.checkInDate)) {
+      res.status(400).json({ error: 'Check-out date must be after check-in date.' });
+      return;
+    }
+
     const { data, error } = await supabase
       .from('reservations')
       .insert({

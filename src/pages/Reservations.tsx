@@ -139,6 +139,10 @@ export function Reservations() {
       setFormError('Please fill in all required fields.');
       return;
     }
+    if (formData.checkOutDate <= formData.checkInDate) {
+      setFormError('Check-out date must be after check-in date.');
+      return;
+    }
     setSubmitting(true);
     setFormError('');
     try {
@@ -208,6 +212,22 @@ export function Reservations() {
   }
 
   const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500';
+
+  // Auto-calculate total amount from room base rate × nights
+  function calcTotal(fd: BookingForm): number | '' {
+    const room = rooms.find((r) => r.id === fd.roomId);
+    if (!room || !fd.checkInDate || !fd.checkOutDate) return '';
+    const nights = Math.round(
+      (new Date(fd.checkOutDate).getTime() - new Date(fd.checkInDate).getTime()) / 86_400_000
+    );
+    return nights > 0 ? Math.round(room.baseRate * nights * 100) / 100 : '';
+  }
+
+  function updateForm(patch: Partial<BookingForm>) {
+    const next = { ...formData, ...patch };
+    const auto = calcTotal(next);
+    setFormData({ ...next, totalAmount: auto !== '' ? auto : next.totalAmount });
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -407,7 +427,7 @@ export function Reservations() {
               </select>
             ), true)}
             {field('Room', (
-              <select value={formData.roomId} onChange={(e) => setFormData({ ...formData, roomId: e.target.value })} className={inputCls}>
+              <select value={formData.roomId} onChange={(e) => updateForm({ roomId: e.target.value })} className={inputCls}>
                 <option value="">Select room…</option>
                 {rooms.filter((r) => r.status === 'Available').map((r) => (
                   <option key={r.id} value={r.id}>Room {r.roomNumber} – {r.roomType} (${r.baseRate}/night)</option>
@@ -426,10 +446,10 @@ export function Reservations() {
               </select>
             ))}
             {field('Check-in Date', (
-              <input type="date" value={formData.checkInDate} onChange={(e) => setFormData({ ...formData, checkInDate: e.target.value })} className={inputCls} />
+              <input type="date" value={formData.checkInDate} onChange={(e) => updateForm({ checkInDate: e.target.value, checkOutDate: formData.checkOutDate && e.target.value >= formData.checkOutDate ? '' : formData.checkOutDate })} className={inputCls} />
             ), true)}
             {field('Check-out Date', (
-              <input type="date" value={formData.checkOutDate} onChange={(e) => setFormData({ ...formData, checkOutDate: e.target.value })} className={inputCls} />
+              <input type="date" value={formData.checkOutDate} min={formData.checkInDate || undefined} onChange={(e) => updateForm({ checkOutDate: e.target.value })} className={inputCls} />
             ), true)}
             {field('Adults', (
               <input type="number" min={1} max={10} value={formData.adults} placeholder="1" onChange={(e) => setFormData({ ...formData, adults: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
@@ -438,9 +458,31 @@ export function Reservations() {
               <input type="number" min={0} max={10} value={formData.children} placeholder="0" onChange={(e) => setFormData({ ...formData, children: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
             ))}
             <div className="sm:col-span-2">
-              {field('Total Amount (USD)', (
-                <input type="number" min={0} step="0.01" value={formData.totalAmount} placeholder="0.00" onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
-              ))}
+              <label className="block text-xs font-medium text-slate-600 mb-1">Total Amount (USD)</label>
+              {(() => {
+                const selectedRoom = rooms.find((r) => r.id === formData.roomId);
+                const nights = formData.checkInDate && formData.checkOutDate
+                  ? Math.round((new Date(formData.checkOutDate).getTime() - new Date(formData.checkInDate).getTime()) / 86_400_000)
+                  : 0;
+                const hasCalc = selectedRoom && nights > 0;
+                return (
+                  <div className="relative">
+                    <input
+                      type="number" min={0} step="0.01"
+                      value={formData.totalAmount}
+                      readOnly={hasCalc}
+                      placeholder="0.00"
+                      onChange={(e) => !hasCalc && setFormData({ ...formData, totalAmount: e.target.value === '' ? '' : Number(e.target.value) })}
+                      className={`${inputCls} ${hasCalc ? 'bg-amber-50 text-amber-900 font-semibold cursor-default' : ''}`}
+                    />
+                    {hasCalc && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-amber-600 font-medium pointer-events-none">
+                        ${selectedRoom.baseRate}/night × {nights} night{nights !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </Modal>
