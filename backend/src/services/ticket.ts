@@ -253,3 +253,195 @@ export function buildTicketText(d: TicketData): string {
   if (d.hotelAddress) lines.push(`📍 ${d.hotelAddress}`);
   return lines.join('\n');
 }
+
+// ── Checkout Receipt ──────────────────────────────────────────────────────────
+
+export interface FolioLineItem {
+  description: string;
+  quantity:    number;
+  unitPrice:   number;
+}
+
+export interface CheckoutReceiptData {
+  bookingId:    string;
+  guestName:    string;
+  email:        string;
+  phone:        string;
+  roomNumber:   string;
+  roomType:     string;
+  checkIn:      string;
+  checkOut:     string;
+  lineItems:    FolioLineItem[];
+  totalAmount:  string;
+  currency:     string;
+  hotelName:    string;
+  hotelAddress?: string;
+  hotelPhone?:   string;
+  hotelEmail?:   string;
+}
+
+export function buildCheckoutReceiptHtml(d: CheckoutReceiptData): string {
+  const n = nights(d.checkIn, d.checkOut);
+  const rows = d.lineItems.map((item) => {
+    const subtotal = (item.unitPrice * item.quantity).toFixed(2);
+    return `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ede8;font-size:13px;color:#374151;">${item.description}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ede8;font-size:13px;color:#374151;text-align:center;">${item.quantity}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ede8;font-size:13px;color:#374151;text-align:right;">${d.currency} ${Number(item.unitPrice).toFixed(2)}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ede8;font-size:13px;color:#374151;text-align:right;">${d.currency} ${subtotal}</td>
+      </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Checkout Receipt — ${d.bookingId}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f4f0; color: #1a1a1a; }
+  .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .header { background: #141414; padding: 32px 36px; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  .brand { color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.5; }
+  .hotel-name { color: #fff; font-size: 20px; font-weight: 700; text-align: right; }
+  .ticket-title { color: #10b981; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 6px; }
+  .booking-id { color: #fff; font-size: 26px; font-weight: 700; }
+  .status-badge { display: inline-block; background: #10b981; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; margin-top: 8px; }
+  .dates { display: flex; background: #1e1e1e; }
+  .date-box { flex: 1; padding: 18px 24px; text-align: center; }
+  .date-box + .date-box { border-left: 1px solid rgba(255,255,255,0.08); }
+  .date-label { color: #10b981; font-size: 9px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 6px; }
+  .date-value { color: #fff; font-size: 15px; font-weight: 700; }
+  .nights-box { flex: 0 0 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1px solid rgba(255,255,255,0.08); }
+  .nights-num { color: #fff; font-size: 28px; font-weight: 800; line-height: 1; }
+  .nights-label { color: rgba(255,255,255,0.4); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 3px; }
+  .body { padding: 28px 36px; }
+  .guest-box { background: #fafaf8; border: 1px solid #ede9e3; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; }
+  .guest-name { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 4px; }
+  .guest-contact { font-size: 12px; color: #6b7280; }
+  .section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #9ca3af; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9ca3af; padding-bottom: 8px; border-bottom: 2px solid #f0ede8; text-align: left; }
+  th:nth-child(2) { text-align: center; }
+  th:nth-child(3), th:nth-child(4) { text-align: right; }
+  .total-row { display: flex; justify-content: space-between; align-items: center; background: #141414; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; }
+  .total-label { color: rgba(255,255,255,0.5); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .total-amount { color: #fff; font-size: 22px; font-weight: 800; }
+  .hotel-info { background: #fafaf8; border: 1px solid #ede9e3; border-radius: 8px; padding: 16px 20px; font-size: 12px; color: #6b7280; line-height: 1.8; }
+  .hotel-info strong { color: #374151; font-weight: 600; }
+  .footer { background: #f5f4f0; padding: 16px 36px; text-align: center; font-size: 10px; color: #9ca3af; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="header-top">
+      <div class="brand">Powered by SERVV HMS</div>
+      <div class="hotel-name">${d.hotelName}</div>
+    </div>
+    <div class="ticket-title">Checkout Receipt</div>
+    <div class="booking-id">${d.bookingId}</div>
+    <div class="status-badge">✓ Checked Out</div>
+  </div>
+
+  <div class="dates">
+    <div class="date-box">
+      <div class="date-label">Check-in</div>
+      <div class="date-value">${fmtDate(d.checkIn)}</div>
+    </div>
+    <div class="nights-box">
+      <div class="nights-num">${n}</div>
+      <div class="nights-label">Night${n !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="date-box">
+      <div class="date-label">Check-out</div>
+      <div class="date-value">${fmtDate(d.checkOut)}</div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="guest-box">
+      <div class="guest-name">${d.guestName}</div>
+      <div class="guest-contact">${d.email} &nbsp;·&nbsp; Room ${d.roomNumber} (${d.roomType})</div>
+    </div>
+
+    <div class="section-title">Folio Charges</div>
+    ${d.lineItems.length > 0 ? `
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>` : `<p style="font-size:13px;color:#9ca3af;margin-bottom:24px;">No additional charges.</p>`}
+
+    <div class="total-row">
+      <div class="total-label">Total Amount Due</div>
+      <div class="total-amount">${d.currency} ${d.totalAmount}</div>
+    </div>
+
+    <div class="hotel-info">
+      <strong>${d.hotelName}</strong><br />
+      ${d.hotelAddress ? `📍 ${d.hotelAddress}<br />` : ''}
+      ${d.hotelPhone   ? `📞 ${d.hotelPhone}<br />`   : ''}
+      ${d.hotelEmail   ? `✉️ ${d.hotelEmail}`          : ''}
+    </div>
+  </div>
+
+  <div class="footer">
+    Thank you for staying with us. We hope to see you again soon!
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+export function buildCheckoutReceiptText(d: CheckoutReceiptData): string {
+  const n = nights(d.checkIn, d.checkOut);
+  const lines = [
+    `🏨 *${d.hotelName}*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `🧾 *CHECKOUT RECEIPT*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `Ref: *${d.bookingId}*`,
+    `Status: ✅ Checked Out`,
+    ``,
+    `👤 *${d.guestName}*`,
+    `🛏 Room ${d.roomNumber} — ${d.roomType}`,
+    ``,
+    `📅 Check-in:  ${fmtDate(d.checkIn)}`,
+    `📅 Check-out: ${fmtDate(d.checkOut)}`,
+    `🌙 ${n} night${n !== 1 ? 's' : ''}`,
+    ``,
+  ];
+
+  if (d.lineItems.length > 0) {
+    lines.push(`━━━━━━━━━━━━━━━━━━━━`, `📋 *Charges*`, ``);
+    for (const item of d.lineItems) {
+      const subtotal = (item.unitPrice * item.quantity).toFixed(2);
+      lines.push(`• ${item.description} x${item.quantity} — ${d.currency} ${subtotal}`);
+    }
+    lines.push(``);
+  }
+
+  lines.push(
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `💵 *TOTAL: ${d.currency} ${d.totalAmount}*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `Thank you for staying with us! 🙏`,
+    `We hope to see you again soon. ⭐`,
+  );
+
+  if (d.hotelPhone)   lines.push(``, `📞 ${d.hotelPhone}`);
+  if (d.hotelAddress) lines.push(`📍 ${d.hotelAddress}`);
+  return lines.join('\n');
+}

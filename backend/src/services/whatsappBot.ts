@@ -249,16 +249,21 @@ async function handleGuests(from: string, text: string, booking: BookingData) {
 
   // Accept "2 adults", "just me", "me and my wife", "2 people", "family of 4", etc.
   const lower = text.trim().toLowerCase();
+  const WORD_NUM: Record<string, number> = {
+    one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+  };
   let n = parseInt(lower, 10);
   if (isNaN(n)) {
-    if (/\bjust\s*(me|myself|1|one)\b|solo|alone/.test(lower))    n = 1;
-    else if (/\b(me\s+and|couple|two|2)\b/.test(lower))           n = 2;
-    else if (/\b(three|3)\b/.test(lower))                          n = 3;
-    else if (/\b(four|4|family)\b/.test(lower))                    n = 4;
-    else if (/\b(five|5)\b/.test(lower))                           n = 5;
-    else {
-      const numWord = lower.match(/\b(\d+)\s*(adult|guest|person|people|pax)/)?.[1];
-      if (numWord) n = parseInt(numWord, 10);
+    if (/\bjust\s*(me|myself|1|one)\b|solo|alone|only me/.test(lower)) {
+      n = 1;
+    } else {
+      // "group of 6", "party of 3", "family of 4", "2 adults", "two guests", etc.
+      const digitMatch = lower.match(/\b(\d+)\b/);
+      const wordMatch  = lower.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+      if (digitMatch) n = parseInt(digitMatch[1], 10);
+      else if (wordMatch) n = WORD_NUM[wordMatch[1]];
+      // "me and ..." → 2
+      else if (/\bme\s+and\b|couple/.test(lower)) n = 2;
     }
   }
   if (!n || n < 1 || n > 20) {
@@ -268,11 +273,11 @@ async function handleGuests(from: string, text: string, booking: BookingData) {
 
   const rooms = await getAvailableRooms(booking.checkIn!, booking.checkOut!);
   if (rooms.length === 0) {
-    clearConvState(from);
+    setConvState(from, { mode: 'booking_check_in', booking: {} });
     await sendText(from,
-      `😔 Sorry, we have *no available rooms* for those dates.\n\n` +
-      `Please try different dates or contact reception for assistance.\n\n` +
-      `Reply *BOOK* to try again.`,
+      `😔 Sorry, no rooms are available for *${fmt(booking.checkIn!)}* → *${fmt(booking.checkOut!)}*.\n\n` +
+      `Please try different dates.\n` +
+      `📅 What date would you like to *check in*?`,
     );
     return;
   }
@@ -713,11 +718,9 @@ export async function handleIncoming(from: string, body: string): Promise<void> 
     const staff = await findStaffByPhone(from);
     if (staff) { await handleStaffMessage(from, body, staff); return; }
 
-    // 2. Existing checked-in / confirmed guest?
-    const ctx = await findCheckedInContext(from);
-    if (ctx) { await handleGuestMessage(from, body, ctx); return; }
-
-    // 3. Active booking conversation?
+    // 2. Active booking conversation?
+    // Must run before guest-context detection so booking replies like "YES"
+    // are not hijacked by in-stay/confirmed-guest menus.
     const state = getConvState(from);
 
     if (state.mode === 'booking_check_in') { await handleCheckIn(from, body); return; }
@@ -727,6 +730,10 @@ export async function handleIncoming(from: string, body: string): Promise<void> 
     if (state.mode === 'booking_name')      { await handleName(from, body, state.booking ?? {}); return; }
     if (state.mode === 'booking_email')     { await handleEmail(from, body, state.booking ?? {}); return; }
     if (state.mode === 'booking_confirm')   { await handleConfirm(from, body, state.booking ?? {}); return; }
+
+    // 3. Existing checked-in / confirmed guest?
+    const ctx = await findCheckedInContext(from);
+    if (ctx) { await handleGuestMessage(from, body, ctx); return; }
 
     // 4. Fresh message — booking intent or help?
     const cmd = body.trim().toUpperCase();

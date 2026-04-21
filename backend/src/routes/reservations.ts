@@ -6,8 +6,8 @@ import {
   sendCheckoutSummary,
   sendText,
 } from '../services/whatsapp';
-import { sendBookingTicketEmail } from '../services/email';
-import { buildTicketText, TicketData } from '../services/ticket';
+import { sendBookingTicketEmail, sendCheckoutReceiptEmail } from '../services/email';
+import { buildTicketText, TicketData, buildCheckoutReceiptText, CheckoutReceiptData, FolioLineItem } from '../services/ticket';
 
 const currFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -243,21 +243,52 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
           checkOut: String(r.checkOutDate),
         }).catch(() => {});
       } else if (status === 'Checked-out') {
-        const folioQuery = supabase
-          .from('folio_line_items')
-          .select('unit_price, quantity, folios!inner(reservation_id)')
-          .eq('folios.reservation_id', req.params.id);
+        const hotelId = rm ? String((rm as any).hotelId ?? '') : '';
+        const hotelQuery = hotelId
+          ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
+          : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
 
-        Promise.resolve(folioQuery).then(({ data: lines }) => {
-          const total = (lines ?? []).reduce(
-            (sum, l) => sum + Number((l as Record<string,unknown>).unit_price) * Number((l as Record<string,unknown>).quantity),
-            0,
-          );
-          sendCheckoutSummary({
-            phone, guestName,
-            roomNo: String(rm.roomNumber),
-            total:  currFmt.format(total),
-          }).catch(() => {});
+        Promise.resolve(
+          supabase
+            .from('folio_line_items')
+            .select('description, unit_price, quantity, folios!inner(reservation_id)')
+            .eq('folios.reservation_id', req.params.id)
+        ).then(async ({ data: lines }) => {
+          const items: FolioLineItem[] = (lines ?? []).map((l) => ({
+            description: String((l as Record<string,unknown>).description ?? 'Charge'),
+            quantity:    Number((l as Record<string,unknown>).quantity),
+            unitPrice:   Number((l as Record<string,unknown>).unit_price),
+          }));
+          const total = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+          const totalFmt = currFmt.format(total);
+
+          const { data: hotelRow } = await Promise.resolve(hotelQuery);
+          const h = hotelRow as Record<string, unknown> | null;
+
+          const receiptData: CheckoutReceiptData = {
+            bookingId:    String(r.id),
+            guestName,
+            email:        String(g.email ?? ''),
+            phone,
+            roomNumber:   String(rm.roomNumber),
+            roomType:     String(rm.roomType),
+            checkIn:      String(r.checkInDate),
+            checkOut:     String(r.checkOutDate),
+            lineItems:    items,
+            totalAmount:  totalFmt,
+            currency:     String(r.currency ?? 'USD'),
+            hotelName:    h ? String(h.name) : (process.env.HOTEL_NAME ?? 'SERVV Hotel'),
+            hotelAddress: h ? String(h.address ?? '') : '',
+            hotelPhone:   h ? String(h.phone ?? '')   : '',
+            hotelEmail:   h ? String(h.email ?? '')   : '',
+          };
+
+          // WhatsApp receipt
+          if (phone.length > 5) {
+            sendText(phone, buildCheckoutReceiptText(receiptData)).catch(() => {});
+          }
+          // Email receipt
+          sendCheckoutReceiptEmail(receiptData).catch(() => {});
         }).catch(() => {});
       }
     }
