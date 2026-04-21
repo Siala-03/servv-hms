@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { sendText } from './whatsapp';
 import { getConvState, setConvState, clearConvState, BookingData } from './conversationState';
+import { sendBookingTicketEmail } from './email';
+import { buildTicketText, TicketData } from './ticket';
 
 const HOTEL      = process.env.HOTEL_NAME   ?? 'SERVV Hotel';
 const HOTEL_ID   = process.env.HOTEL_ID     ?? '';
@@ -383,10 +385,10 @@ async function handleConfirm(from: string, text: string, booking: BookingData) {
   }
 
   const { selectedRoom, checkIn, checkOut, adults, name, email } = booking;
-  const nameParts  = (name ?? '').trim().split(/\s+/);
-  const firstName  = nameParts[0];
-  const lastName   = nameParts.slice(1).join(' ') || '—';
-  const phone      = from.startsWith('+') ? from : `+${from}`;
+  const nameParts = (name ?? '').trim().split(/\s+/);
+  const firstName = nameParts[0];
+  const lastName  = nameParts.slice(1).join(' ') || '—';
+  const phone     = from.startsWith('+') ? from : `+${from}`;
 
   try {
     // Upsert guest
@@ -445,18 +447,31 @@ async function handleConfirm(from: string, text: string, booking: BookingData) {
 
     clearConvState(from);
 
-    await sendText(from,
-      `🎉 *Booking Confirmed!*\n\n` +
-      `Your reservation at *${HOTEL}* is confirmed.\n\n` +
-      `📋 *Booking ID:* \`${res.id}\`\n` +
-      `🛏 *Room:* ${selectedRoom!.roomType} (${selectedRoom!.roomNumber})\n` +
-      `📅 *Check-in:* ${fmt(checkIn!)}\n` +
-      `📅 *Check-out:* ${fmt(checkOut!)}\n` +
-      `💵 *Total:* $${selectedRoom!.totalPrice}\n\n` +
-      `✅ Complete your online pre-registration here:\n` +
-      `${FRONTEND}/checkin/${res.id}\n\n` +
-      `See you soon! 🏨`,
-    );
+    const checkinUrl = `${FRONTEND}/checkin/${res.id}`;
+
+    const ticketData: TicketData = {
+      bookingId:   res.id,
+      guestName:   `${firstName} ${lastName}`,
+      email:       email!,
+      phone,
+      roomNumber:  selectedRoom!.roomNumber,
+      roomType:    selectedRoom!.roomType,
+      floor:       '',
+      ratePlan:    'Standard',
+      checkIn:     checkIn!,
+      checkOut:    checkOut!,
+      adults:      adults ?? 1,
+      totalAmount: String(selectedRoom!.totalPrice),
+      currency:    'USD',
+      checkinUrl,
+      hotelName:   HOTEL,
+    };
+
+    // Send ticket via WhatsApp
+    await sendText(from, buildTicketText(ticketData));
+
+    // Send ticket via email (fire-and-forget)
+    sendBookingTicketEmail(ticketData).catch(() => {});
   } catch (err) {
     console.error('[WhatsAppBot] Booking error:', err);
     clearConvState(from);

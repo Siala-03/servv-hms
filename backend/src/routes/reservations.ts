@@ -4,7 +4,10 @@ import {
   sendBookingConfirmation,
   sendCheckinWelcome,
   sendCheckoutSummary,
+  sendText,
 } from '../services/whatsapp';
+import { sendBookingTicketEmail } from '../services/email';
+import { buildTicketText, TicketData } from '../services/ticket';
 
 const currFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -121,24 +124,49 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     if (error) throw new Error(error.message);
     const r = toReservation(data);
 
-    // Fire-and-forget WhatsApp confirmation + check-in link
+    // Fire-and-forget: email + WhatsApp ticket
     const g  = r.guest as Record<string, unknown> | null;
     const rm = r.room  as Record<string, unknown> | null;
-    if (g && String(g.phone ?? '').length > 5) {
-      const phone     = String(g.phone);
-      const guestName = `${g.firstName} ${g.lastName}`;
+    if (g) {
+      const phone      = String(g.phone ?? '');
+      const guestName  = `${g.firstName} ${g.lastName}`;
       const checkinUrl = `${FRONTEND_URL}/checkin/${r.id}`;
-      sendBookingConfirmation({
-        phone, guestName,
-        bookingId: String(r.id),
-        roomNo:    rm ? String(rm.roomNumber) : '',
-        roomType:  rm ? String(rm.roomType)   : '',
-        checkIn:   String(r.checkInDate),
-        checkOut:  String(r.checkOutDate),
-        adults:    Number(r.adults),
-        children:  Number(r.children),
-        amount:    currFmt.format(Number(r.totalAmount)),
-        checkinUrl,
+      const amount     = currFmt.format(Number(r.totalAmount));
+
+      // Fetch hotel info for ticket
+      Promise.resolve(
+        supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single()
+      ).then(({ data: hotel }) => {
+        const h = hotel as Record<string, unknown> | null;
+        const ticketData: TicketData = {
+          bookingId:    String(r.id),
+          guestName,
+          email:        String(g.email ?? ''),
+          phone,
+          roomNumber:   rm ? String(rm.roomNumber) : '',
+          roomType:     rm ? String(rm.roomType)   : '',
+          floor:        rm ? String((rm as any).floor ?? '') : '',
+          ratePlan:     r.ratePlan ? String((r.ratePlan as any).name ?? 'Standard') : 'Standard',
+          checkIn:      String(r.checkInDate),
+          checkOut:     String(r.checkOutDate),
+          adults:       Number(r.adults),
+          children:     Number(r.children),
+          totalAmount:  amount,
+          currency:     String(r.currency ?? 'USD'),
+          checkinUrl,
+          hotelName:    h ? String(h.name) : (process.env.HOTEL_NAME ?? 'SERVV Hotel'),
+          hotelAddress: h ? String(h.address ?? '') : '',
+          hotelPhone:   h ? String(h.phone ?? '')   : '',
+          hotelEmail:   h ? String(h.email ?? '')   : '',
+        };
+
+        // Email ticket
+        sendBookingTicketEmail(ticketData).catch(() => {});
+
+        // WhatsApp: text ticket + confirmation
+        if (phone.length > 5) {
+          sendText(phone, buildTicketText(ticketData)).catch(() => {});
+        }
       }).catch(() => {});
     }
 
