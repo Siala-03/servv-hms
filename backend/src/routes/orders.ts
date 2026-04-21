@@ -6,7 +6,7 @@ const router = Router();
 
 const JOIN_QUERY = `
   *,
-  guests       ( id, first_name, last_name ),
+  guests       ( id, first_name, last_name, phone ),
   reservations ( id, room_id, rooms ( room_number ) )
 `;
 
@@ -25,7 +25,7 @@ function toOrder(row: Record<string, unknown>) {
     amount:             Number(row.amount),
     currency:           row.currency,
     requestedAt:        row.requested_at,
-    guest: g ? { id: g.id, firstName: g.first_name, lastName: g.last_name } : null,
+    guest: g ? { id: g.id, firstName: g.first_name, lastName: g.last_name, phone: g.phone } : null,
     roomNumber: rm?.room_number ?? null,
   };
 }
@@ -68,9 +68,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // Notify guest via WhatsApp
     const g = order.guest as Record<string, unknown> | null;
-    if (g) {
+    if (g && String(g.phone ?? '').length > 5) {
       sendOrderReceived({
-        phone:      String((b.guestPhone as string) ?? ''),
+        phone:      String(g.phone),
         guestName:  `${g.firstName} ${g.lastName}`,
         roomNo:     String(order.roomNumber ?? ''),
         department: String(order.department),
@@ -102,9 +102,9 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
     // Notify guest when order is delivered
     if (status === 'Delivered') {
       const g = order.guest as Record<string, unknown> | null;
-      if (g) {
+      if (g && String(g.phone ?? '').length > 5) {
         sendOrderDelivered({
-          phone:      '',   // guest phone not in join; fetched via guest lookup if needed
+          phone:      String(g.phone),
           guestName:  `${g.firstName} ${g.lastName}`,
           department: String(order.department),
         }).catch(() => {});

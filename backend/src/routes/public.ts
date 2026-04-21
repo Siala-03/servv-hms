@@ -3,6 +3,15 @@
 
 import { Router } from 'express';
 import { supabase } from '../lib/supabase';
+import {
+  sendBookingConfirmation,
+  sendCheckinLink,
+  sendText,
+} from '../services/whatsapp';
+
+const currFmt    = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+const HOTEL_NAME   = process.env.HOTEL_NAME ?? 'SERVV Hotel';
 
 const router = Router();
 
@@ -106,6 +115,20 @@ router.post('/checkin/:id', async (req, res) => {
     .from('reservations')
     .update({ special_requests: note })
     .eq('id', reservation.id);
+
+  // Confirm pre-registration to guest via WhatsApp
+  Promise.resolve(
+    supabase.from('guests').select('phone, first_name').eq('id', reservation.guest_id).single()
+  ).then(({ data: g }) => {
+      const phone = String((g as Record<string, unknown> | null)?.phone ?? '');
+      const name  = String((g as Record<string, unknown> | null)?.first_name ?? 'Guest');
+      if (phone.length > 5) {
+        sendText(
+          phone,
+          `🏨 *${HOTEL_NAME}*\n\nHi ${name}! Your online pre-registration is complete ✅\n\nJust show your ID at the front desk on arrival — no paperwork needed.\n\nSee you soon!`,
+        ).catch(() => {});
+      }
+    }).catch(() => {});
 
   res.json({ success: true });
 });
@@ -261,6 +284,30 @@ router.post('/book/:hotelId', async (req, res) => {
 
   if (resErr || !reservation) return res.status(500).json({ error: 'Failed to create reservation' });
 
+  // Send WhatsApp booking confirmation to guest
+  if (phone?.length > 5) {
+    const { data: roomRow } = await supabase
+      .from('rooms')
+      .select('room_number, room_type')
+      .eq('id', roomId)
+      .single();
+
+    const rm = roomRow as Record<string, unknown> | null;
+    sendBookingConfirmation({
+      phone:      phone.trim(),
+      guestName:  `${firstName} ${lastName}`,
+      bookingId:  reservation.id,
+      roomNo:     rm ? String(rm.room_number) : '',
+      roomType:   rm ? String(rm.room_type)   : '',
+      checkIn:    checkIn,
+      checkOut:   checkOut,
+      adults:     adults ?? 1,
+      children:   children ?? 0,
+      amount:     currFmt.format(totalAmount ?? 0),
+      checkinUrl: `${FRONTEND_URL}/checkin/${reservation.id}`,
+    }).catch(() => {});
+  }
+
   res.json({ bookingId: reservation.id });
 });
 
@@ -343,6 +390,20 @@ router.post('/room/:roomId/order', async (req, res) => {
 
   if (error || !order) return res.status(500).json({ error: 'Failed to place order' });
 
+  // Alert hotel front desk via WhatsApp
+  Promise.resolve(
+    supabase.from('hotel_accounts').select('phone').eq('id', room.hotel_id).single()
+  ).then(({ data: h }) => {
+    const hotelPhone = String((h as Record<string, unknown> | null)?.phone ?? '');
+    if (hotelPhone.length > 5) {
+      const itemList = allItems.map((i) => `  • ${i}`).join('\n');
+      sendText(
+        hotelPhone,
+        `🛎 *New ${department} Order — Room ${room.room_number}*\n\n${itemList}\n\nOrder #${order.id.slice(0, 8)}`,
+      ).catch(() => {});
+    }
+  }).catch(() => {});
+
   res.json({ orderId: order.id, roomNumber: room.room_number });
 });
 
@@ -377,6 +438,19 @@ router.post('/room/:roomId/request', async (req, res) => {
     .single();
 
   if (error || !task) return res.status(500).json({ error: 'Failed to submit request' });
+
+  // Alert hotel front desk via WhatsApp
+  Promise.resolve(
+    supabase.from('hotel_accounts').select('phone').eq('id', room.hotel_id).single()
+  ).then(({ data: h }) => {
+    const hotelPhone = String((h as Record<string, unknown> | null)?.phone ?? '');
+    if (hotelPhone.length > 5) {
+      sendText(
+        hotelPhone,
+        `🔔 *Guest Request — Room ${room.room_number}*\n\nType: ${type}${notes ? `\nNote: ${notes}` : ''}\n\nPriority: ${priority}`,
+      ).catch(() => {});
+    }
+  }).catch(() => {});
 
   res.json({ taskId: task.id, roomNumber: room.room_number });
 });

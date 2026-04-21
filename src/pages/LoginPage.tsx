@@ -5,18 +5,25 @@ import { useAuth } from '../contexts/AuthContext';
 import { ROLE_HOME } from '../lib/rbac';
 import { BrandLogo } from '../components/BrandLogo';
 
+const HOTEL_ID_STORAGE_KEY = 'servv_hotel_id';
+
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate        = useNavigate();
   const location        = useLocation();
   const [params]        = useSearchParams();
+  const urlHotelId      = params.get('hotel')?.trim() ?? '';
 
-  const [hotelId,   setHotelId]   = useState(params.get('hotel') ?? '');
+  const [hotelId,   setHotelId]   = useState(() => urlHotelId || localStorage.getItem(HOTEL_ID_STORAGE_KEY) || '');
   const [username,  setUsername]  = useState('');
   const [password,  setPassword]  = useState('');
   const [showPass,  setShowPass]  = useState(false);
   const [error,     setError]     = useState('');
   const [loading,   setLoading]   = useState(false);
+
+  useEffect(() => {
+    if (urlHotelId) setHotelId(urlHotelId);
+  }, [urlHotelId]);
 
   // If already logged in, redirect to home
   useEffect(() => {
@@ -32,7 +39,9 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(username.trim(), password, hotelId.trim() || undefined);
+      const trimmedHotelId = hotelId.trim();
+      await login(username.trim(), password, trimmedHotelId || undefined);
+      if (trimmedHotelId) localStorage.setItem(HOTEL_ID_STORAGE_KEY, trimmedHotelId);
       // redirect handled by useEffect above
     } catch (err: any) {
       setError(err.message ?? 'Login failed');

@@ -122,7 +122,35 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .single();
 
     if (error) { res.status(404).json({ error: 'Task not found' }); return; }
-    res.json(toTask(data));
+    const task = toTask(data);
+
+    // Notify staff if assignment changed
+    const st = task.staff as Record<string, unknown> | null;
+    const rm = task.room  as Record<string, unknown> | null;
+    if (st && b.assignedStaffId) {
+      Promise.resolve(
+        supabase
+          .from('staff_members')
+          .select('phone')
+          .eq('id', String(b.assignedStaffId))
+          .single()
+      ).then(({ data: staffRow }) => {
+        const phone = String((staffRow as Record<string, unknown> | null)?.phone ?? '');
+        if (phone.length > 5) {
+          sendTaskAssigned({
+            phone,
+            staffName: `${st.firstName} ${st.lastName}`,
+            roomNo:    rm ? String(rm.roomNumber) : '',
+            roomType:  rm ? String(rm.roomType)   : '',
+            priority:  String(b.priority ?? task.priority ?? 'Normal'),
+            dueAt:     b.dueAt ? String(b.dueAt) : undefined,
+            notes:     String(b.notes ?? task.notes ?? '') || undefined,
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
+    res.json(task);
   } catch (err) {
     next(err);
   }
