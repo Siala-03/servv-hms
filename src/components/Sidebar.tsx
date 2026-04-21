@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, Network, ConciergeBell,
   Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3,
-  LogOut, ShieldCheck, UserCog, Brain,
+  LogOut, ShieldCheck, UserCog, Brain, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, UserRole, canAccess } from '../lib/rbac';
@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { name: 'Housekeeping',    path: '/housekeeping', icon: Sparkles        },
   { name: 'Staff',           path: '/staff',        icon: UserCircle      },
   { name: 'Reports',         path: '/reports',      icon: BarChart3       },
-  { name: 'Intelligence',   path: '/intelligence', icon: Brain           },
+  { name: 'Intelligence',    path: '/intelligence', icon: Brain           },
   { name: 'User Accounts',   path: '/users',        icon: UserCog         },
   { name: 'Hotels',          path: '/superadmin',   icon: ShieldCheck     },
 ];
@@ -35,6 +35,7 @@ const ROLE_BADGE: Record<UserRole, string> = {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate         = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const visible = NAV_ITEMS.filter((item) => canAccess(user?.role, item.path));
 
@@ -47,12 +48,20 @@ export function Sidebar() {
     ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase()
     : '?';
 
-  return (
-    <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
+  const panelContent = (
+    <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-full border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
 
       <div className="relative px-6 pt-6 pb-4 flex flex-col items-start gap-3 border-b border-slate-800/80">
+        {/* Close button — mobile only */}
+        <button
+          className="lg:hidden absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1"
+          onClick={() => setMobileOpen(false)}
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         <BrandLogo variant="light" className="h-7" />
-        <div className="w-full">
+        <div className="w-full pr-6 lg:pr-0">
           <span className="text-white font-semibold text-sm leading-snug block break-words">
             {user?.hotelName ?? 'SERVV HMS'}
           </span>
@@ -68,6 +77,7 @@ export function Sidebar() {
               key={item.name}
               to={item.path}
               end={item.path === '/dashboard'}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                   isActive
@@ -108,5 +118,40 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* ── Mobile hamburger button ── */}
+      <button
+        className="lg:hidden fixed top-3.5 left-4 z-40 w-9 h-9 flex items-center justify-center bg-slate-900 text-white rounded-lg shadow-lg border border-slate-700"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* ── Mobile backdrop ── */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile slide-in drawer ── */}
+      <div
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 ease-in-out ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {panelContent}
+      </div>
+
+      {/* ── Desktop sidebar (always visible) ── */}
+      <div className="hidden lg:block sticky top-0 h-screen shrink-0 w-72">
+        {panelContent}
+      </div>
+    </>
   );
 }

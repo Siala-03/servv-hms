@@ -252,21 +252,21 @@ export function Reservations() {
             </div>
             <button
               onClick={exportCSV}
-              className="focus-ring flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm"
+              className="focus-ring flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm"
             >
-              <Download className="w-4 h-4" /> Export CSV
+              <Download className="w-4 h-4" /><span className="hidden sm:inline">Export CSV</span>
             </button>
             <button
               onClick={() => { setFormData(emptyForm()); setFormError(''); setShowNew(true); }}
-              className="focus-ring brand-btn flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25"
+              className="focus-ring brand-btn flex items-center gap-2 px-3 sm:px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium shadow-sm shadow-amber-900/25"
             >
-              <Plus className="w-4 h-4" /> New Booking
+              <Plus className="w-4 h-4" /><span className="hidden sm:inline">New Booking</span><span className="sm:hidden">New</span>
             </button>
           </>
         }
       />
 
-      <section className="hero-banner p-5 sm:p-6 mb-6 text-slate-100">
+      <section className="hero-banner hidden sm:block p-5 sm:p-6 mb-6 text-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1.5">Reservation Flow</p>

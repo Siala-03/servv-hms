@@ -609,6 +609,7 @@ export function Reports() {
             <p className="text-sm font-semibold text-gray-900">Channel Performance</p>
             <span className="text-xs text-gray-400">{filtered.length} bookings in period</span>
           </div>
+          <div className="table-shell">
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
@@ -655,6 +656,7 @@ export function Reports() {
               </tfoot>
             )}
           </table>
+          </div>
         </div>
 
         {/* Top guests */}
@@ -662,6 +664,7 @@ export function Reports() {
           <div className="p-5 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-900">Top Guests by Revenue</p>
           </div>
+          <div className="table-shell">
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-400 uppercase bg-gray-50/80 border-b border-gray-100">
               <tr>
@@ -691,6 +694,7 @@ export function Reports() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

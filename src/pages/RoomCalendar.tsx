@@ -22,7 +22,7 @@ interface CalReservation {
 
 const COL_W    = 44;   // px per day column
 const ROW_H    = 48;   // px per room row
-const LEFT_W   = 200;  // px for the sticky room-label column
+const LEFT_W   = 160;  // px for the sticky room-label column
 
 const PALETTE = [
   { bar: '#3b82f6', bg: '#eff6ff', text: '#1e40af' },  // blue

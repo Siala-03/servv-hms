@@ -304,11 +304,11 @@ export function FrontDesk() {
             </div>
 
             {floors.map((floor) => (
-              <div key={floor} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Floor {floor}</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div key={floor} className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 shadow-sm">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Floor {floor}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
                   {filtered.filter((r) => r.floor === floor).map((room) => (
-                    <div key={room.id} className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${statusColor[room.status] ?? 'bg-gray-100 border-gray-200'}`}>
+                    <div key={room.id} className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${statusColor[room.status] ?? 'bg-gray-100 border-gray-200'}`}>
                       <div className="flex justify-between items-start mb-2">
                         <span className="font-bold text-lg">{room.roomNumber}</span>
                         <button
