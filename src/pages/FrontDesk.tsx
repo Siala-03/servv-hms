@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Key, LogOut, UserPlus, Search, MoreHorizontal, QrCode, X, Printer } from 'lucide-react';
+import { Key, LogOut, UserPlus, Search, MoreHorizontal, QrCode, X, Printer, Download, MapPin, Phone, Mail } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { listRooms, updateRoomStatus } from '../services/roomsService';
@@ -10,6 +10,14 @@ import { Room, RoomStatus } from '../domain/models';
 
 interface ArrivalRow { id: string; name: string; room: string; type: string; checkInDate: string; status: string; guestId: string; }
 interface DepartureRow { id: string; name: string; room: string; checkOutDate: string; status: string; roomId: string; }
+interface RoomQrData {
+  hotel: {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+  };
+}
 
 const statusColor: Record<string, string> = {
   Available:   'bg-emerald-100 border-emerald-200 text-emerald-800',
@@ -32,6 +40,8 @@ export function FrontDesk() {
   const [roomStatusTarget, setRoomStatusTarget] = useState<{ room: Room; next: RoomStatus } | null>(null);
   const [processing, setProcessing]         = useState(false);
   const [qrRoom, setQrRoom]                 = useState<Room | null>(null);
+  const [qrData, setQrData]                 = useState<RoomQrData | null>(null);
+  const [qrDataLoading, setQrDataLoading]   = useState(false);
 
   function reload() {
     setIsLoading(true);
@@ -77,6 +87,40 @@ export function FrontDesk() {
 
   useEffect(() => { reload(); }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!qrRoom) {
+      setQrData(null);
+      setQrDataLoading(false);
+      return;
+    }
+
+    setQrDataLoading(true);
+    api.get<{ room: unknown; hotel: { name?: string; address?: string; phone?: string; email?: string } }>(`/api/public/room/${qrRoom.id}`)
+      .then((data) => {
+        if (cancelled) return;
+        setQrData({
+          hotel: {
+            name: data?.hotel?.name ?? 'SERVV Hotel',
+            address: data?.hotel?.address ?? '',
+            phone: data?.hotel?.phone ?? '',
+            email: data?.hotel?.email ?? '',
+          },
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setQrData({ hotel: { name: 'SERVV Hotel', address: '', phone: '', email: '' } });
+      })
+      .finally(() => {
+        if (!cancelled) setQrDataLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [qrRoom]);
+
   async function handleCheckIn() {
     if (!checkInTarget) return;
     setProcessing(true);
@@ -105,6 +149,104 @@ export function FrontDesk() {
       await updateRoomStatus(roomStatusTarget.room.id, roomStatusTarget.next);
       reload();
     } finally { setProcessing(false); setRoomStatusTarget(null); }
+  }
+
+  async function downloadQrPng(room: Room) {
+    const guestUrl = `${window.location.origin}/room/${room.id}`;
+    const qrSrc    = `https://api.qrserver.com/v1/create-qr-code/?size=900x900&data=${encodeURIComponent(guestUrl)}`;
+    const hotel    = qrData?.hotel ?? { name: 'SERVV Hotel', address: '', phone: '', email: '' };
+
+    const response = await fetch(qrSrc);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1400;
+    canvas.height = 1900;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const wrap = (text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+      if (!text.trim()) return y;
+      const words = text.split(/\s+/);
+      let line = '';
+      let currentY = y;
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          ctx.fillText(line, x, currentY);
+          line = word;
+          currentY += lineHeight;
+        } else {
+          line = test;
+        }
+      }
+      if (line) ctx.fillText(line, x, currentY);
+      return currentY + lineHeight;
+    };
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, canvas.width, 220);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(0, 220, canvas.width, 8);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 62px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText(hotel.name || 'SERVV Hotel', 80, 105);
+
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '500 30px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText('Guest Room Service QR', 80, 162);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '800 84px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText(`Room ${room.roomNumber}`, 80, 340);
+
+    ctx.fillStyle = '#334155';
+    ctx.font = '600 38px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText(`${room.roomType}  |  Floor ${room.floor}`, 80, 400);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.fillRect(250, 470, 900, 900);
+    ctx.strokeRect(250, 470, 900, 900);
+    ctx.drawImage(bitmap, 300, 520, 800, 800);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 28px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText('Scan to open guest services menu', 420, 1405);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '700 34px system-ui, -apple-system, Segoe UI, sans-serif';
+    ctx.fillText('Hotel Contact', 80, 1505);
+
+    ctx.fillStyle = '#334155';
+    ctx.font = '500 29px system-ui, -apple-system, Segoe UI, sans-serif';
+    let nextY = 1560;
+    nextY = wrap(`Address: ${hotel.address || 'N/A'}`, 80, nextY, 1240, 44);
+    nextY = wrap(`Phone: ${hotel.phone || 'N/A'}`, 80, nextY, 1240, 44);
+    nextY = wrap(`Email: ${hotel.email || 'N/A'}`, 80, nextY, 1240, 44);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 23px system-ui, -apple-system, Segoe UI, sans-serif';
+    wrap(`URL: ${guestUrl}`, 80, Math.max(nextY + 10, 1820), 1240, 34);
+
+    const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1));
+    if (!pngBlob) return;
+
+    const url = URL.createObjectURL(pngBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `room-${room.roomNumber}-qr.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   const ROOM_STATUS_CYCLE: Record<RoomStatus, RoomStatus> = {
@@ -288,11 +430,16 @@ export function FrontDesk() {
       {qrRoom && (() => {
         const guestUrl = `${window.location.origin}/room/${qrRoom.id}`;
         const qrSrc    = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(guestUrl)}`;
+        const hotelName = qrData?.hotel.name ?? 'SERVV Hotel';
+        const hotelAddress = qrData?.hotel.address ?? '';
+        const hotelPhone = qrData?.hotel.phone ?? '';
+        const hotelEmail = qrData?.hotel.email ?? '';
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100">
               <div className="flex justify-between items-center mb-4">
                 <div>
+                  <p className="text-xs uppercase tracking-wide text-amber-700 font-semibold">Room QR Card</p>
                   <h3 className="font-semibold text-gray-900">Room {qrRoom.roomNumber}</h3>
                   <p className="text-gray-500 text-sm">{qrRoom.roomType} · Floor {qrRoom.floor}</p>
                 </div>
@@ -300,30 +447,51 @@ export function FrontDesk() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="flex justify-center mb-4">
-                <img src={qrSrc} alt={`QR code for room ${qrRoom.roomNumber}`} className="w-56 h-56 rounded-lg border border-gray-100" />
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-slate-800 mb-1">{hotelName}</p>
+                <div className="space-y-1.5 text-xs text-slate-600">
+                  <p className="flex items-start gap-1.5"><MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400" /> <span>{hotelAddress || (qrDataLoading ? 'Loading address...' : 'Address not set')}</span></p>
+                  <p className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400" /> <span>{hotelPhone || (qrDataLoading ? 'Loading phone...' : 'Phone not set')}</span></p>
+                  <p className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-slate-400" /> <span>{hotelEmail || (qrDataLoading ? 'Loading email...' : 'Email not set')}</span></p>
+                </div>
               </div>
-              <p className="text-center text-gray-400 text-xs mb-4 break-all">{guestUrl}</p>
-              <div className="flex gap-2">
+
+              <div className="flex justify-center mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                <img src={qrSrc} alt={`QR code for room ${qrRoom.roomNumber}`} className="w-60 h-60 rounded-lg border border-gray-100" />
+              </div>
+
+              <p className="text-center text-gray-500 text-xs mb-4 break-all">{guestUrl}</p>
+
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => window.open(guestUrl, '_blank')}
-                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
                 >
                   Preview
+                </button>
+                <button
+                  onClick={() => downloadQrPng(qrRoom)}
+                  className="px-3 py-2 flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-sm font-medium transition-colors border border-amber-200"
+                >
+                  <Download className="w-4 h-4" /> PNG
                 </button>
                 <button
                   onClick={() => {
                     const w = window.open('', '_blank')!;
                     w.document.write(`<html><body style="margin:0;display:flex;flex-direction:column;align-items:center;padding:32px;font-family:sans-serif">
-                      <h2 style="margin-bottom:8px">Room ${qrRoom.roomNumber}</h2>
-                      <p style="color:#666;margin-bottom:16px">${qrRoom.roomType} — Floor ${qrRoom.floor}</p>
+                      <h2 style="margin-bottom:8px">${hotelName}</h2>
+                      <p style="color:#111;margin-bottom:4px;font-size:20px;font-weight:700">Room ${qrRoom.roomNumber}</p>
+                      <p style="color:#666;margin-bottom:10px">${qrRoom.roomType} — Floor ${qrRoom.floor}</p>
                       <img src="${qrSrc}" width="300" height="300" />
                       <p style="margin-top:12px;color:#888;font-size:12px">Scan to order room service or request assistance</p>
+                      <p style="margin-top:14px;color:#444;font-size:12px">${hotelAddress || ''}</p>
+                      <p style="margin-top:4px;color:#444;font-size:12px">${hotelPhone || ''}${hotelPhone && hotelEmail ? ' • ' : ''}${hotelEmail || ''}</p>
                     </body></html>`);
                     w.document.close();
                     w.print();
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="px-3 py-2 flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   <Printer className="w-4 h-4" /> Print
                 </button>

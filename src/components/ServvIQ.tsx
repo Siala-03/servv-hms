@@ -8,6 +8,8 @@ interface Message {
   text: string;
 }
 
+const CHAT_STORAGE_PREFIX = 'servv_iq_chat_v1';
+
 const SUGGESTIONS = [
   'How is occupancy looking this week?',
   'Which channel brings the most revenue?',
@@ -62,6 +64,49 @@ export function ServvIQ() {
 
   // Only show for manager/superadmin
   if (!user || !['manager', 'superadmin'].includes(user.role)) return null;
+
+  const chatStorageKey = `${CHAT_STORAGE_PREFIX}:${user.id}:${user.hotelId ?? 'global'}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(chatStorageKey);
+      if (!raw) {
+        setMessages([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        setMessages([]);
+        return;
+      }
+
+      const restored = parsed
+        .filter((m): m is Message => {
+          if (!m || typeof m !== 'object') return false;
+          const role = (m as Record<string, unknown>).role;
+          const text = (m as Record<string, unknown>).text;
+          return (role === 'user' || role === 'model') && typeof text === 'string' && text.trim().length > 0;
+        })
+        .slice(-80);
+
+      setMessages(restored);
+    } catch {
+      setMessages([]);
+    }
+  }, [chatStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem(chatStorageKey);
+        return;
+      }
+      localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-80)));
+    } catch {
+      // Ignore storage errors; chat continues in-memory.
+    }
+  }, [chatStorageKey, messages]);
 
   useEffect(() => {
     if (open) {

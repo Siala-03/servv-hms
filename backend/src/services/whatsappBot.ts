@@ -377,14 +377,16 @@ async function handleEmail(from: string, text: string, booking: BookingData) {
 }
 
 async function handleConfirm(from: string, text: string, booking: BookingData) {
-  if (CANCEL_RE.test(text) || /^no$/i.test(text)) {
+  const normalized = text.trim().toLowerCase().replace(/[.!?,\s]+$/g, '');
+
+  if (CANCEL_RE.test(text) || /^(no|n|nope)$/.test(normalized)) {
     clearConvState(from);
     await sendText(from, `No problem! Reply *BOOK* whenever you're ready to try again. 😊`);
     return;
   }
 
-  const confirmRe = /^(yes|yeah|yep|yup|confirm|ok|okay|sure|absolutely|correct|go ahead|proceed|book it|do it)$/i;
-  if (!confirmRe.test(text.trim())) {
+  const confirmRe = /^(yes|y|yeah|yep|yup|confirm|ok|okay|sure|absolutely|correct|go ahead|proceed|book it|do it)$/;
+  if (!confirmRe.test(normalized)) {
     await sendText(from, `Reply *YES* to confirm your booking, or *CANCEL* to start over.`);
     return;
   }
