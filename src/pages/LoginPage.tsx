@@ -6,6 +6,7 @@ import { ROLE_HOME } from '../lib/rbac';
 import { BrandLogo } from '../components/BrandLogo';
 
 const HOTEL_ID_STORAGE_KEY = 'servv_hotel_id';
+const REMEMBER_HOTEL_ID_STORAGE_KEY = 'servv_remember_hotel_id';
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -13,8 +14,10 @@ export function LoginPage() {
   const location        = useLocation();
   const [params]        = useSearchParams();
   const urlHotelId      = params.get('hotel')?.trim() ?? '';
+  const rememberDefault = localStorage.getItem(REMEMBER_HOTEL_ID_STORAGE_KEY) !== 'false';
 
   const [hotelId,   setHotelId]   = useState(() => urlHotelId || localStorage.getItem(HOTEL_ID_STORAGE_KEY) || '');
+  const [rememberHotelId, setRememberHotelId] = useState(rememberDefault);
   const [username,  setUsername]  = useState('');
   const [password,  setPassword]  = useState('');
   const [showPass,  setShowPass]  = useState(false);
@@ -24,6 +27,11 @@ export function LoginPage() {
   useEffect(() => {
     if (urlHotelId) setHotelId(urlHotelId);
   }, [urlHotelId]);
+
+  useEffect(() => {
+    localStorage.setItem(REMEMBER_HOTEL_ID_STORAGE_KEY, String(rememberHotelId));
+    if (!rememberHotelId) localStorage.removeItem(HOTEL_ID_STORAGE_KEY);
+  }, [rememberHotelId]);
 
   // If already logged in, redirect to home
   useEffect(() => {
@@ -41,7 +49,12 @@ export function LoginPage() {
     try {
       const trimmedHotelId = hotelId.trim();
       await login(username.trim(), password, trimmedHotelId || undefined);
-      if (trimmedHotelId) localStorage.setItem(HOTEL_ID_STORAGE_KEY, trimmedHotelId);
+      if (rememberHotelId && trimmedHotelId) {
+        localStorage.setItem(HOTEL_ID_STORAGE_KEY, trimmedHotelId);
+      }
+      if (!rememberHotelId) {
+        localStorage.removeItem(HOTEL_ID_STORAGE_KEY);
+      }
       // redirect handled by useEffect above
     } catch (err: any) {
       setError(err.message ?? 'Login failed');
@@ -78,6 +91,15 @@ export function LoginPage() {
               placeholder="htl-xxxxxxxx"
               autoComplete="organization"
             />
+            <label className="mt-1 inline-flex items-center gap-2 text-xs text-slate-400 select-none">
+              <input
+                type="checkbox"
+                checked={rememberHotelId}
+                onChange={(e) => setRememberHotelId(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/60"
+              />
+              Remember Hotel ID on this device
+            </label>
           </div>
 
           {/* Username */}
