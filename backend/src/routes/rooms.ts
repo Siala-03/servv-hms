@@ -15,6 +15,31 @@ function toRoom(row: Record<string, unknown>) {
   };
 }
 
+// POST /api/rooms
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = req.body as Record<string, unknown>;
+    const { data, error } = await supabase
+      .from('rooms')
+      .insert({
+        hotel_id:      body.hotelId,
+        room_number:   body.roomNumber,
+        room_type:     body.roomType,
+        floor:         body.floor ?? 1,
+        base_rate:     body.baseRate ?? 0,
+        status:        body.status ?? 'Available',
+        max_occupancy: body.maxOccupancy ?? 2,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    res.status(201).json(toRoom(data));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/rooms
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {

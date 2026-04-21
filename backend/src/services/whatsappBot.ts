@@ -25,34 +25,104 @@ const CANCEL_RE = /^(cancel|stop|quit|restart|start over|reset|menu|back)$/i;
 
 // ── Gemini date extractor ─────────────────────────────────────────────────────
 
-async function parseDate(raw: string): Promise<string | null> {
-  if (!GEMINI_KEY) {
-    // Fallback: try common formats
-    const iso = raw.match(/\d{4}-\d{2}-\d{2}/)?.[0];
-    if (iso) return iso;
-    const dmy = raw.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
-    if (dmy) {
-      const y = dmy[3] ? (dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]) : new Date().getFullYear().toString();
-      return `${y}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
-    }
-    return null;
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+function parseLocalDate(raw: string): string | null {
+  const s     = raw.trim().toLowerCase().replace(/[,\.]/g, '');
+  const today = new Date();
+  const todayY = today.getFullYear();
+
+  // "today"
+  if (/^today$/.test(s)) return today.toISOString().slice(0, 10);
+
+  // "tomorrow"
+  if (/^tomorrow$/.test(s)) {
+    const d = new Date(today); d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `Today is ${today}. Extract the date from: "${raw}". Reply ONLY with YYYY-MM-DD or the word invalid.` }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 20 },
-      }),
-    },
-  );
-  const data = await res.json() as any;
-  const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text) && text > today) return text;
+  // "next monday/tuesday/..."
+  const dowMatch = s.match(/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/);
+  if (dowMatch) {
+    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const target = days.indexOf(dowMatch[1]);
+    const d = new Date(today);
+    d.setDate(d.getDate() + ((target - d.getDay() + 7) % 7 || 7));
+    return d.toISOString().slice(0, 10);
+  }
+
+  // ISO: 2026-04-25
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2,'0')}-${iso[3].padStart(2,'0')}`;
+
+  // DD/MM/YYYY or DD-MM-YYYY or DD/MM or DD-MM
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+  if (dmy) {
+    const y = dmy[3] ? (dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]) : String(todayY);
+    return `${y}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+  }
+
+  // "21 april" / "21 april 2026" / "21st april" / "21st of april 2026"
+  const dmyText = s.match(/^(\d{1,2})(?:st|nd|rd|th)?(?:\s+of)?\s+([a-z]+)(?:\s+(\d{2,4}))?$/);
+  if (dmyText) {
+    const mon = MONTHS[dmyText[2]];
+    if (mon) {
+      const y = dmyText[3] ? (dmyText[3].length === 2 ? `20${dmyText[3]}` : dmyText[3]) : String(todayY);
+      return `${y}-${String(mon).padStart(2,'0')}-${dmyText[1].padStart(2,'0')}`;
+    }
+  }
+
+  // "april 21" / "april 21 2026" / "april 21st"
+  const mdyText = s.match(/^([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{2,4}))?$/);
+  if (mdyText) {
+    const mon = MONTHS[mdyText[1]];
+    if (mon) {
+      const y = mdyText[3] ? (mdyText[3].length === 2 ? `20${mdyText[3]}` : mdyText[3]) : String(todayY);
+      return `${y}-${String(mon).padStart(2,'0')}-${mdyText[2].padStart(2,'0')}`;
+    }
+  }
+
+  // "25 apr 26" short year
+  const shortYear = s.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{2})$/);
+  if (shortYear) {
+    const mon = MONTHS[shortYear[2]];
+    if (mon) return `20${shortYear[3]}-${String(mon).padStart(2,'0')}-${shortYear[1].padStart(2,'0')}`;
+  }
+
+  return null;
+}
+
+async function parseDate(raw: string): Promise<string | null> {
+  // Try local parser first — handles most natural language without AI
+  const local = parseLocalDate(raw);
+  if (local) return local;
+
+  // Fall back to Gemini for anything unusual
+  if (!GEMINI_KEY) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Today is ${today}. Extract the date from: "${raw}". Reply ONLY with YYYY-MM-DD or the word invalid.` }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 20 },
+        }),
+      },
+    );
+    const data = await res.json() as any;
+    const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text) && text >= today) return text;
+  } catch { /* ignore */ }
+
   return null;
 }
 
@@ -73,20 +143,37 @@ async function isBookingIntent(text: string): Promise<boolean> {
 // ── Available rooms ───────────────────────────────────────────────────────────
 
 async function getAvailableRooms(checkIn: string, checkOut: string) {
-  const { data: rooms } = await supabase
+  // Try with hotel_id filter first; fall back to all rooms if none found
+  let roomsQuery = supabase
     .from('rooms')
     .select('id, room_number, room_type, base_rate, max_occupancy, status')
-    .eq('hotel_id', HOTEL_ID)
     .neq('status', 'Maintenance')
     .order('base_rate');
 
-  const { data: conflicts } = await supabase
+  if (HOTEL_ID) roomsQuery = (roomsQuery as any).eq('hotel_id', HOTEL_ID);
+
+  let { data: rooms } = await roomsQuery;
+
+  // Fallback: rooms without hotel_id set (legacy data)
+  if ((!rooms || rooms.length === 0) && HOTEL_ID) {
+    const { data: fallback } = await supabase
+      .from('rooms')
+      .select('id, room_number, room_type, base_rate, max_occupancy, status')
+      .neq('status', 'Maintenance')
+      .order('base_rate');
+    rooms = fallback;
+  }
+
+  const conflictsQuery = supabase
     .from('reservations')
     .select('room_id')
-    .eq('hotel_id', HOTEL_ID)
     .not('status', 'in', '("Cancelled","Checked-out")')
     .lt('check_in_date', checkOut)
     .gt('check_out_date', checkIn);
+
+  const { data: conflicts } = HOTEL_ID
+    ? await (conflictsQuery as any).eq('hotel_id', HOTEL_ID)
+    : await conflictsQuery;
 
   const takenIds = new Set((conflicts ?? []).map((r: any) => r.room_id));
   const n = nights(checkIn, checkOut);
@@ -158,9 +245,22 @@ async function handleCheckOut(from: string, text: string, booking: BookingData) 
 async function handleGuests(from: string, text: string, booking: BookingData) {
   if (CANCEL_RE.test(text)) { clearConvState(from); await sendGreeting(from); return; }
 
-  const n = parseInt(text.trim(), 10);
-  if (!n || n < 1 || n > 10) {
-    await sendText(from, `❌ Please reply with a number between 1 and 10.\n_e.g. *2*_`);
+  // Accept "2 adults", "just me", "me and my wife", "2 people", "family of 4", etc.
+  const lower = text.trim().toLowerCase();
+  let n = parseInt(lower, 10);
+  if (isNaN(n)) {
+    if (/\bjust\s*(me|myself|1|one)\b|solo|alone/.test(lower))    n = 1;
+    else if (/\b(me\s+and|couple|two|2)\b/.test(lower))           n = 2;
+    else if (/\b(three|3)\b/.test(lower))                          n = 3;
+    else if (/\b(four|4|family)\b/.test(lower))                    n = 4;
+    else if (/\b(five|5)\b/.test(lower))                           n = 5;
+    else {
+      const numWord = lower.match(/\b(\d+)\s*(adult|guest|person|people|pax)/)?.[1];
+      if (numWord) n = parseInt(numWord, 10);
+    }
+  }
+  if (!n || n < 1 || n > 20) {
+    await sendText(from, `❌ How many adults will be staying? Please reply with a number.\n_e.g. *2*_`);
     return;
   }
 
@@ -192,12 +292,25 @@ async function handleGuests(from: string, text: string, booking: BookingData) {
 async function handlePickRoom(from: string, text: string, booking: BookingData) {
   if (CANCEL_RE.test(text)) { clearConvState(from); await sendGreeting(from); return; }
 
-  const choice = parseInt(text.trim(), 10);
   const rooms  = booking.rooms ?? [];
-  const room   = rooms[choice - 1];
+  const lower  = text.trim().toLowerCase();
 
+  // Accept: "1", "option 1", "first", "the suite", partial room type name
+  let choice = parseInt(lower, 10);
+  if (isNaN(choice)) {
+    if (/\b(first|one|1st)\b/.test(lower))   choice = 1;
+    else if (/\b(second|two|2nd)\b/.test(lower)) choice = 2;
+    else if (/\b(third|three|3rd)\b/.test(lower)) choice = 3;
+    else {
+      // Try matching partial room type name
+      const idx = rooms.findIndex((r) => r.roomType.toLowerCase().includes(lower) || lower.includes(r.roomType.toLowerCase()));
+      if (idx !== -1) choice = idx + 1;
+    }
+  }
+
+  const room = rooms[choice - 1];
   if (!room) {
-    await sendText(from, `❌ Please reply with a number between *1* and *${rooms.length}*.`);
+    await sendText(from, `❌ Please reply with a number between *1* and *${rooms.length}*.\n_e.g. reply *1* for the first option_`);
     return;
   }
 
@@ -263,7 +376,8 @@ async function handleConfirm(from: string, text: string, booking: BookingData) {
     return;
   }
 
-  if (!/^yes$/i.test(text.trim())) {
+  const confirmRe = /^(yes|yeah|yep|yup|confirm|ok|okay|sure|absolutely|correct|go ahead|proceed|book it|do it)$/i;
+  if (!confirmRe.test(text.trim())) {
     await sendText(from, `Reply *YES* to confirm your booking, or *CANCEL* to start over.`);
     return;
   }
