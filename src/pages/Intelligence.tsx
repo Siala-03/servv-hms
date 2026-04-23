@@ -23,6 +23,8 @@ interface PricingRec {
   change: number; occupancy7d: number;
   signal: 'surge' | 'high' | 'normal' | 'low' | 'discount';
   rationale: string;
+  source?: 'ai' | 'rules';
+  confidence?: number;
 }
 
 interface AiInsight {
@@ -107,6 +109,7 @@ export function Intelligence() {
     ? Math.round(forecast.filter((d) => d.isWeekend).reduce((s, d) => s + d.occupancyRate, 0) / forecast.filter((d) => d.isWeekend).length)
     : 0;
   const surgeRecs    = pricing.filter((p) => p.signal === 'surge' || p.signal === 'high').length;
+  const pricingSource = pricing[0]?.source === 'ai' ? 'ai' : 'rules';
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -207,7 +210,11 @@ export function Intelligence() {
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-900">Smart Pricing Recommendations</h3>
-              <p className="text-xs text-slate-400">Based on 7-day booking pace per room type</p>
+              <p className="text-xs text-slate-400">
+                {pricingSource === 'ai'
+                  ? 'AI-driven ADR recommendations from demand signals and booking pace'
+                  : 'Rule-based ADR recommendations from 7-day booking pace'}
+              </p>
             </div>
           </div>
           <div className="divide-y divide-slate-100">
@@ -226,6 +233,11 @@ export function Intelligence() {
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${meta.bg} ${meta.text} ${meta.border}`}>
                         <Icon className="w-3 h-3" /> {meta.label}
                       </span>
+                      {p.source === 'ai' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border bg-purple-50 text-purple-700 border-purple-200">
+                          AI {typeof p.confidence === 'number' ? `${Math.round(p.confidence)}%` : ''}
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <span className="text-base font-bold text-slate-900">{usd.format(p.recommended)}</span>
@@ -248,7 +260,11 @@ export function Intelligence() {
             })}
           </div>
           <div className="p-4 bg-slate-50/60 border-t border-slate-100">
-            <p className="text-xs text-slate-400">Rates are recommendations — apply them manually in your room settings or channel manager.</p>
+            <p className="text-xs text-slate-400">
+              {pricingSource === 'ai'
+                ? 'AI mode active. Rates are recommendations — review and apply in your room settings or channel manager.'
+                : 'AI key not configured or unavailable. Using rule-based recommendations.'}
+            </p>
           </div>
         </div>
 

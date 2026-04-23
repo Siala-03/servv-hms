@@ -146,6 +146,98 @@ function isWeekend(iso: string) {
   return day === 5 || day === 6; // Fri / Sat
 }
 
+type PricingSignal = 'surge' | 'high' | 'normal' | 'low' | 'discount';
+
+interface PricingRecommendation {
+  type: string;
+  baseRate: number;
+  recommended: number;
+  change: number;
+  occupancy7d: number;
+  signal: PricingSignal;
+  rationale: string;
+  source: 'ai' | 'rules';
+  confidence?: number;
+}
+
+function parseJsonMaybeFenced(raw: string): any {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('```')) {
+    const unfenced = trimmed
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/, '');
+    return JSON.parse(unfenced);
+  }
+  return JSON.parse(trimmed);
+}
+
+function signalFrom(occupancy: number, changePct: number): PricingSignal {
+  if (occupancy >= 85 || changePct >= 15) return 'surge';
+  if (occupancy >= 70 || changePct >= 8) return 'high';
+  if (occupancy >= 50) return 'normal';
+  if (occupancy >= 30 || changePct <= -5) return 'low';
+  return 'discount';
+}
+
+function buildRulePricing(rooms: any[], upcoming: any[]): PricingRecommendation[] {
+  const types: Record<string, { count: number; booked: Set<string>; baseRate: number }> = {};
+  rooms.forEach((r: any) => {
+    if (!types[r.room_type]) {
+      types[r.room_type] = {
+        count: 0,
+        booked: new Set(),
+        baseRate: Number(r.base_rate ?? 0),
+      };
+    }
+    types[r.room_type].count++;
+  });
+
+  upcoming.forEach((res: any) => {
+    const room = rooms.find((r: any) => r.id === res.room_id);
+    if (room) types[room.room_type]?.booked.add(res.room_id);
+  });
+
+  return Object.entries(types).map(([type, { count, booked, baseRate }]) => {
+    const occupancy = count > 0 ? Math.round((booked.size / count) * 100) : 0;
+    let multiplier = 1.0;
+    let signal: PricingSignal = 'normal';
+    let rationale = '';
+
+    if (occupancy >= 85) {
+      multiplier = 1.20; signal = 'surge';
+      rationale = `${occupancy}% booked in next 7 days — strong demand, raise rates.`;
+    } else if (occupancy >= 70) {
+      multiplier = 1.10; signal = 'high';
+      rationale = `${occupancy}% booked — healthy demand, modest uplift recommended.`;
+    } else if (occupancy >= 50) {
+      multiplier = 1.0; signal = 'normal';
+      rationale = `${occupancy}% booked — demand is stable, keep current rates.`;
+    } else if (occupancy >= 30) {
+      multiplier = 0.92; signal = 'low';
+      rationale = `${occupancy}% booked — soft demand, a small discount may drive bookings.`;
+    } else {
+      multiplier = 0.85; signal = 'discount';
+      rationale = `Only ${occupancy}% booked — consider promotional pricing to fill rooms.`;
+    }
+
+    const recommended = Math.round(baseRate * multiplier);
+    const change = Math.round((multiplier - 1) * 100);
+
+    return {
+      type,
+      baseRate,
+      recommended,
+      change,
+      occupancy7d: occupancy,
+      signal,
+      rationale,
+      source: 'rules' as const,
+      confidence: 70,
+    };
+  });
+}
+
 // ── GET /api/intelligence/forecast ───────────────────────────────────────────
 // Returns 30-day occupancy forecast from confirmed/pending/checked-in bookings.
 router.get('/forecast', async (req: AuthRequest, res, next) => {
@@ -192,6 +284,7 @@ router.get('/forecast', async (req: AuthRequest, res, next) => {
 // Rule-based dynamic rate recommendations per room type.
 router.get('/pricing', async (req: AuthRequest, res, next) => {
   try {
+    const apiKey = getServvInsightsApiKey();
     const hotelId = req.hotelId;
     const today   = new Date();
     const in7     = isoDate(addDays(today, 7));
@@ -212,49 +305,102 @@ router.get('/pricing', async (req: AuthRequest, res, next) => {
     if (hotelId) resQ = resQ.eq('hotel_id', hotelId);
     const { data: upcoming } = await resQ;
 
-    // Group by room type
-    const types: Record<string, { count: number; booked: Set<string>; baseRate: number }> = {};
-    (rooms ?? []).forEach((r: any) => {
-      if (!types[r.room_type]) types[r.room_type] = { count: 0, booked: new Set(), baseRate: Number(r.base_rate) };
-      types[r.room_type].count++;
+    const ruleRecommendations = buildRulePricing(rooms ?? [], upcoming ?? []);
+
+    if (!apiKey || ruleRecommendations.length === 0) {
+      return res.json(ruleRecommendations);
+    }
+
+    const hotelOccupancy = (rooms ?? []).length
+      ? Math.round((((rooms ?? []).filter((r: any) => r.status === 'Occupied').length) / (rooms ?? []).length) * 100)
+      : 0;
+
+    const prompt = `You are an AI revenue manager for hotels.
+Given room-type booking pace data for the next 7 days, recommend ADR per room type.
+
+INPUT JSON:
+${JSON.stringify({
+  hotelOccupancy,
+  roomTypes: ruleRecommendations.map((r) => ({
+    type: r.type,
+    baseRate: r.baseRate,
+    occupancy7d: r.occupancy7d,
+    ruleRecommended: r.recommended,
+  })),
+}, null, 2)}
+
+Output strict JSON array only (no markdown):
+[
+  {
+    "type": "string",
+    "recommended": 123,
+    "rationale": "under 25 words",
+    "confidence": 0-100
+  }
+]
+
+Rules:
+- Keep recommended within -30% to +35% of baseRate.
+- Higher occupancy should generally imply higher ADR.
+- Do not omit any room type.`;
+
+    const modelRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.25 },
+        }),
+      },
+    );
+
+    if (!modelRes.ok) {
+      return res.json(ruleRecommendations);
+    }
+
+    const modelData = await modelRes.json() as any;
+    const rawText = modelData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]';
+
+    let parsed: any[];
+    try {
+      const p = parseJsonMaybeFenced(rawText);
+      parsed = Array.isArray(p) ? p : [];
+    } catch {
+      return res.json(ruleRecommendations);
+    }
+
+    const rulesByType = new Map(ruleRecommendations.map((r) => [r.type, r]));
+    const aiMerged = ruleRecommendations.map((rule) => {
+      const ai = parsed.find((x: any) => String(x?.type) === rule.type);
+      const rawRecommended = Number(ai?.recommended);
+      const boundedRecommended = Number.isFinite(rawRecommended)
+        ? Math.max(Math.round(rule.baseRate * 0.7), Math.min(Math.round(rule.baseRate * 1.35), Math.round(rawRecommended)))
+        : rule.recommended;
+
+      const change = rule.baseRate > 0
+        ? Math.round(((boundedRecommended - rule.baseRate) / rule.baseRate) * 100)
+        : 0;
+
+      return {
+        ...rule,
+        recommended: boundedRecommended,
+        change,
+        signal: signalFrom(rule.occupancy7d, change),
+        rationale: String(ai?.rationale || rule.rationale),
+        source: 'ai' as const,
+        confidence: Math.max(0, Math.min(100, Number(ai?.confidence) || Math.max(55, rule.confidence ?? 70))),
+      };
     });
 
-    // Count booked room-nights (simplified: unique rooms booked at least once in window)
-    (upcoming ?? []).forEach((res: any) => {
-      const room = (rooms ?? []).find((r: any) => r.id === res.room_id);
-      if (room) types[room.room_type]?.booked.add(res.room_id);
-    });
+    // Keep stable ordering by occupancy pressure desc, then room type
+    aiMerged.sort((a, b) => b.occupancy7d - a.occupancy7d || a.type.localeCompare(b.type));
 
-    const recommendations = Object.entries(types).map(([type, { count, booked, baseRate }]) => {
-      const occupancy = count > 0 ? Math.round((booked.size / count) * 100) : 0;
-      let multiplier = 1.0;
-      let signal: 'surge' | 'high' | 'normal' | 'low' | 'discount' = 'normal';
-      let rationale = '';
+    // Ensure all entries have known room type from baseline recommendations
+    const complete = aiMerged.filter((r) => rulesByType.has(r.type));
 
-      if (occupancy >= 85) {
-        multiplier = 1.20; signal = 'surge';
-        rationale = `${occupancy}% booked in next 7 days — strong demand, raise rates.`;
-      } else if (occupancy >= 70) {
-        multiplier = 1.10; signal = 'high';
-        rationale = `${occupancy}% booked — healthy demand, modest uplift recommended.`;
-      } else if (occupancy >= 50) {
-        multiplier = 1.0; signal = 'normal';
-        rationale = `${occupancy}% booked — demand is stable, keep current rates.`;
-      } else if (occupancy >= 30) {
-        multiplier = 0.92; signal = 'low';
-        rationale = `${occupancy}% booked — soft demand, a small discount may drive bookings.`;
-      } else {
-        multiplier = 0.85; signal = 'discount';
-        rationale = `Only ${occupancy}% booked — consider promotional pricing to fill rooms.`;
-      }
-
-      const recommended = Math.round(baseRate * multiplier);
-      const change      = Math.round((multiplier - 1) * 100);
-
-      return { type, baseRate, recommended, change, occupancy7d: occupancy, signal, rationale };
-    });
-
-    res.json(recommendations);
+    res.json(complete.length > 0 ? complete : ruleRecommendations);
   } catch (err) { next(err); }
 });
 
