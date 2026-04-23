@@ -25,6 +25,37 @@ function toFolio(row: Record<string, unknown>) {
   };
 }
 
+// GET /api/folios?reservationIds=id1,id2,id3
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reservationIdsParam = String(req.query.reservationIds ?? '').trim();
+    const reservationIds = reservationIdsParam
+      ? reservationIdsParam.split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+
+    let query = supabase
+      .from('folios')
+      .select('id, reservation_id, is_closed, currency')
+      .order('created_at', { ascending: false });
+
+    if (reservationIds.length > 0) {
+      query = query.in('reservation_id', reservationIds);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    res.json((data ?? []).map((row) => ({
+      id: row.id,
+      reservationId: row.reservation_id,
+      isClosed: row.is_closed,
+      currency: row.currency,
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/folios/by-reservation/:reservationId
 router.get('/by-reservation/:reservationId', async (req: Request, res: Response, next: NextFunction) => {
   try {

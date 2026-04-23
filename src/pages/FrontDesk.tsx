@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Key, LogOut, UserPlus, Search, MoreHorizontal, QrCode, X, Printer, Download, MapPin, Phone, Mail } from 'lucide-react';
+import { Key, LogOut, UserPlus, Search, MoreHorizontal, QrCode, X, Printer, Download, MapPin, Phone, Mail, CalendarDays, Users, Receipt } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { listRooms, updateRoomStatus } from '../services/roomsService';
@@ -8,8 +8,31 @@ import { updateReservationStatus } from '../services/reservationsService';
 import { api } from '../lib/api';
 import { Room, RoomStatus } from '../domain/models';
 
-interface ArrivalRow { id: string; name: string; room: string; type: string; checkInDate: string; status: string; guestId: string; }
-interface DepartureRow { id: string; name: string; room: string; checkOutDate: string; status: string; roomId: string; }
+type FrontDeskWindow = 'today' | 'tomorrow' | 'week';
+
+interface StayRow {
+  id: string;
+  name: string;
+  room: string;
+  type: string;
+  checkInDate: string;
+  checkOutDate: string;
+  status: string;
+  guestId: string;
+  roomId: string;
+  channel: string;
+  adults: number;
+  children: number;
+  createdAt: string;
+  folioId?: string;
+}
+
+interface FolioSummary {
+  id: string;
+  reservationId: string;
+  isClosed: boolean;
+  currency: string;
+}
 interface RoomQrData {
   hotel: {
     name: string;
@@ -30,13 +53,14 @@ const statusColor: Record<string, string> = {
 export function FrontDesk() {
   const [rooms, setRooms]         = useState<Room[]>([]);
   const [search, setSearch]       = useState('');
-  const [arrivals, setArrivals]   = useState<ArrivalRow[]>([]);
-  const [departures, setDepartures] = useState<DepartureRow[]>([]);
+  const [arrivals, setArrivals]   = useState<StayRow[]>([]);
+  const [departures, setDepartures] = useState<StayRow[]>([]);
+  const [frontDeskWindow, setFrontDeskWindow] = useState<FrontDeskWindow>('today');
   const [isLoading, setIsLoading] = useState(true);
 
   // Confirm dialogs
-  const [checkInTarget, setCheckInTarget]   = useState<ArrivalRow | null>(null);
-  const [checkOutTarget, setCheckOutTarget] = useState<DepartureRow | null>(null);
+  const [checkInTarget, setCheckInTarget]   = useState<StayRow | null>(null);
+  const [checkOutTarget, setCheckOutTarget] = useState<StayRow | null>(null);
   const [roomStatusTarget, setRoomStatusTarget] = useState<{ room: Room; next: RoomStatus } | null>(null);
   const [processing, setProcessing]         = useState(false);
   const [qrRoom, setQrRoom]                 = useState<Room | null>(null);
@@ -51,13 +75,21 @@ export function FrontDesk() {
       listRooms(),
       api.get<{
         id: string; status: string; checkInDate: string; checkOutDate: string; roomId: string;
+        channel: string; adults: number; children: number; createdAt: string;
         guest?: { id: string; firstName: string; lastName: string } | null;
         room?: { id: string; roomNumber: string; roomType: string } | null;
       }[]>('/api/reservations'),
-    ]).then(([roomData, resData]) => {
+    ]).then(async ([roomData, resData]) => {
       setRooms(roomData);
 
-      const arr: ArrivalRow[] = resData
+      const reservationIds = resData.map((r) => r.id);
+      const folios = reservationIds.length
+        ? await api.get<FolioSummary[]>(`/api/folios?reservationIds=${reservationIds.join(',')}`).catch(() => [])
+        : [];
+
+      const folioMap = new Map(folios.map((f) => [f.reservationId, f.id]));
+
+      const arr: StayRow[] = resData
         .filter((r) => r.checkInDate === today && (r.status === 'Confirmed' || r.status === 'Pending'))
         .map((r) => ({
           id:          r.id,
@@ -65,19 +97,34 @@ export function FrontDesk() {
           room:        r.room?.roomNumber ?? '–',
           type:        r.room?.roomType ?? '',
           checkInDate: r.checkInDate,
+          checkOutDate: r.checkOutDate,
           status:      r.status,
           guestId:     r.guest?.id ?? '',
+          roomId:      r.roomId,
+          channel:     r.channel ?? 'Direct',
+          adults:      Number(r.adults ?? 1),
+          children:    Number(r.children ?? 0),
+          createdAt:   r.createdAt,
+          folioId:     folioMap.get(r.id),
         }));
 
-      const dep: DepartureRow[] = resData
+      const dep: StayRow[] = resData
         .filter((r) => r.checkOutDate === today && r.status === 'Checked-in')
         .map((r) => ({
           id:          r.id,
           name:        r.guest ? `${r.guest.firstName} ${r.guest.lastName}` : 'Unknown',
           room:        r.room?.roomNumber ?? '–',
+          type:        r.room?.roomType ?? '',
+          checkInDate: r.checkInDate,
           checkOutDate: r.checkOutDate,
           status:      r.status,
           roomId:      r.roomId,
+          guestId:     r.guest?.id ?? '',
+          channel:     r.channel ?? 'Direct',
+          adults:      Number(r.adults ?? 1),
+          children:    Number(r.children ?? 0),
+          createdAt:   r.createdAt,
+          folioId:     folioMap.get(r.id),
         }));
 
       setArrivals(arr);
@@ -262,6 +309,39 @@ export function FrontDesk() {
     ? rooms.filter((r) => r.roomNumber.includes(search) || r.roomType.toLowerCase().includes(search.toLowerCase()))
     : rooms;
 
+  function iso(offsetDays: number) {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const todayIso = iso(0);
+  const tomorrowIso = iso(1);
+  const weekEndIso = iso(7);
+
+  function inWindow(dateIso: string, window: FrontDeskWindow) {
+    if (window === 'today') return dateIso === todayIso;
+    if (window === 'tomorrow') return dateIso === tomorrowIso;
+    return dateIso >= todayIso && dateIso <= weekEndIso;
+  }
+
+  const arrivalsView = arrivals.filter((r) => inWindow(r.checkInDate, frontDeskWindow));
+  const departuresView = departures.filter((r) => inWindow(r.checkOutDate, frontDeskWindow));
+
+  function nights(checkInDate: string, checkOutDate: string) {
+    return Math.max(1, Math.round((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86_400_000));
+  }
+
+  function shortId(id: string) {
+    return id.length > 8 ? id.slice(0, 8) : id;
+  }
+
+  const channelTone: Record<string, string> = {
+    Direct: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    Inquiry: 'bg-blue-50 text-blue-700 border-blue-200',
+    Hold: 'bg-amber-50 text-amber-700 border-amber-200',
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <PageHeader
@@ -339,20 +419,53 @@ export function FrontDesk() {
 
           {/* Arrivals & Departures */}
           <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-2">
+              <div className="grid grid-cols-3 gap-1 text-xs">
+                {([
+                  { key: 'today', label: 'Today' },
+                  { key: 'tomorrow', label: 'Tomorrow' },
+                  { key: 'week', label: 'Week' },
+                ] as const).map((w) => (
+                  <button
+                    key={w.key}
+                    onClick={() => setFrontDeskWindow(w.key)}
+                    className={`px-2.5 py-2 rounded-lg font-medium transition-colors ${
+                      frontDeskWindow === w.key
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Key className="w-4 h-4 text-amber-600" /> Today's Arrivals
+                  <Key className="w-4 h-4 text-amber-600" /> Arrivals
                 </h3>
-                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">{arrivals.length}</span>
+                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">{arrivalsView.length}</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {arrivals.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No arrivals today.</div>}
-                {arrivals.map((guest) => (
+                {arrivalsView.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No arrivals in this window.</div>}
+                {arrivalsView.map((guest) => (
                   <div key={guest.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-gray-900">{guest.name}</span>
-                      <span className="text-xs text-gray-500">{guest.checkInDate}</span>
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div>
+                        <span className="font-semibold text-gray-900">{guest.name}</span>
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                          <span className={`px-2 py-0.5 rounded-full border ${channelTone[guest.channel] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>{guest.channel}</span>
+                          <span className="px-2 py-0.5 rounded-full border border-slate-200 text-slate-500 bg-white">Res #{shortId(guest.id)}</span>
+                          <span className="px-2 py-0.5 rounded-full border border-slate-200 text-slate-500 bg-white">Folio {guest.folioId ? `#${shortId(guest.folioId)}` : 'Pending'}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" /> {guest.checkInDate}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-500 mb-2">
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {guest.adults}A{guest.children ? ` / ${guest.children}C` : ''}</span>
+                      <span>{nights(guest.checkInDate, guest.checkOutDate)} night{nights(guest.checkInDate, guest.checkOutDate) !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Room {guest.room} • {guest.type}</span>
@@ -371,17 +484,28 @@ export function FrontDesk() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <LogOut className="w-4 h-4 text-amber-600" /> Today's Departures
+                  <LogOut className="w-4 h-4 text-amber-600" /> Departures
                 </h3>
-                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">{departures.length}</span>
+                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded-full">{departuresView.length}</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {departures.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No departures today.</div>}
-                {departures.map((guest) => (
+                {departuresView.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No departures in this window.</div>}
+                {departuresView.map((guest) => (
                   <div key={guest.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-gray-900">{guest.name}</span>
-                      <span className="text-xs text-gray-500">{guest.checkOutDate}</span>
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div>
+                        <span className="font-semibold text-gray-900">{guest.name}</span>
+                        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                          <span className={`px-2 py-0.5 rounded-full border ${channelTone[guest.channel] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>{guest.channel}</span>
+                          <span className="px-2 py-0.5 rounded-full border border-slate-200 text-slate-500 bg-white">Res #{shortId(guest.id)}</span>
+                          <span className="px-2 py-0.5 rounded-full border border-slate-200 text-slate-500 bg-white inline-flex items-center gap-1"><Receipt className="w-3 h-3" /> Folio {guest.folioId ? `#${shortId(guest.folioId)}` : 'Pending'}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><CalendarDays className="w-3.5 h-3.5" /> {guest.checkOutDate}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-500 mb-2">
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {guest.adults}A{guest.children ? ` / ${guest.children}C` : ''}</span>
+                      <span>{nights(guest.checkInDate, guest.checkOutDate)} night{nights(guest.checkInDate, guest.checkOutDate) !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Room {guest.room}</span>
