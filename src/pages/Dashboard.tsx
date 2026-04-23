@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { BedDouble, Banknote, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight } from 'lucide-react';
+import { BedDouble, Banknote, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight, Hotel, TimerReset, CalendarClock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { PageHeader } from '../components/PageHeader';
 import { StatsCard } from '../components/StatsCard';
@@ -24,8 +24,21 @@ interface ApiRoom { id: string; status: string; }
 interface ApiTask { id: string; status: string; notes?: string; room?: { roomNumber: string } | null; createdAt: string; }
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function isoToday() { return new Date().toISOString().split('T')[0]; }
+
+function startOfDay(dateLike: string | Date) {
+  const d = new Date(dateLike);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function diffDays(start: string | Date, end: string | Date) {
+  const a = startOfDay(start).getTime();
+  const b = startOfDay(end).getTime();
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -56,6 +69,50 @@ export function Dashboard() {
   const todayRevenue  = checkedIn.reduce((s, r) => s + (r.totalAmount ?? 0), 0);
   const adr           = checkedIn.length ? todayRevenue / checkedIn.length : 0;
   const pendingCI     = arrivalsToday.length;
+
+  const nonCancelled = reservations.filter((r) => !['Cancelled'].includes(String(r.status)));
+
+  const avgLos = nonCancelled.length
+    ? nonCancelled.reduce((sum, r) => sum + Math.max(1, diffDays(r.checkInDate, r.checkOutDate)), 0) / nonCancelled.length
+    : 0;
+
+  const avgLeadTime = nonCancelled.length
+    ? nonCancelled.reduce((sum, r) => sum + diffDays(r.createdAt, r.checkInDate), 0) / nonCancelled.length
+    : 0;
+
+  // Approximate daily room revenue by spreading reservation total evenly across stay nights.
+  const dailyRoomRevenue = (dayIso: string) => nonCancelled.reduce((sum, r) => {
+    const nights = Math.max(1, diffDays(r.checkInDate, r.checkOutDate));
+    const activeThatDay = r.checkInDate <= dayIso && r.checkOutDate > dayIso;
+    return sum + (activeThatDay ? (Number(r.totalAmount ?? 0) / nights) : 0);
+  }, 0);
+
+  const todayRoomRevenue = dailyRoomRevenue(today);
+  const revPar = rooms.length ? todayRoomRevenue / rooms.length : 0;
+
+  const avgAdrForWindow = (offsetStart: number, days: number) => {
+    let revenue = 0;
+    let occupied = 0;
+    for (let i = offsetStart; i < offsetStart + days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().split('T')[0];
+      revenue += dailyRoomRevenue(iso);
+      occupied += reservations.filter((r) => r.checkInDate <= iso && r.checkOutDate > iso && r.status !== 'Cancelled').length;
+    }
+    return occupied ? revenue / occupied : 0;
+  };
+
+  const adrLast7 = avgAdrForWindow(-6, 7);
+  const adrPrev7 = avgAdrForWindow(-13, 7);
+  const adrTrendPct = adrPrev7 > 0 ? ((adrLast7 - adrPrev7) / adrPrev7) * 100 : 0;
+
+  const statusBuckets = ['Available', 'Occupied', 'Reserved', 'Cleaning', 'Maintenance'];
+  const inventoryBars = statusBuckets.map((status) => {
+    const count = rooms.filter((r) => String(r.status) === status).length;
+    const percent = rooms.length ? Math.round((count / rooms.length) * 100) : 0;
+    return { status, count, percent };
+  });
 
   // 7-day occupancy chart
   const occupancyData = Array.from({ length: 7 }, (_, i) => {
@@ -154,6 +211,64 @@ export function Dashboard() {
         <StatsCard title="Revenue (Checked-in)" value={loading ? '—' : usd.format(todayRevenue)} icon={Banknote}    color="emerald" />
         <StatsCard title="Average Daily Rate"   value={loading ? '—' : usd.format(adr)}          icon={TrendingUp}   color="purple" />
         <StatsCard title="Pending Check-ins"    value={loading ? '—' : String(pendingCI)}         icon={CalendarCheck} color="amber" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatsCard
+          title="RevPAR"
+          value={loading ? '—' : usd2.format(revPar)}
+          icon={Hotel}
+          color="emerald"
+        />
+        <StatsCard
+          title="ADR Trend (7d)"
+          value={loading ? '—' : usd2.format(adrLast7)}
+          icon={TrendingUp}
+          color="purple"
+          trend={loading ? undefined : Number(adrTrendPct.toFixed(1))}
+          trendLabel="vs previous 7 days"
+        />
+        <StatsCard
+          title="Average LOS"
+          value={loading ? '—' : `${avgLos.toFixed(1)} nights`}
+          icon={TimerReset}
+          color="amber"
+        />
+        <StatsCard
+          title="Lead Time"
+          value={loading ? '—' : `${avgLeadTime.toFixed(1)} days`}
+          icon={CalendarClock}
+          color="red"
+        />
+      </div>
+
+      <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl mb-8">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-slate-900">Inventory Mix</h3>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Live room status bars</p>
+        </div>
+
+        <div className="space-y-3">
+          {inventoryBars.map((bar) => (
+            <div key={bar.status}>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="font-medium text-slate-700">{bar.status}</span>
+                <span className="text-slate-500">{bar.count} rooms ({bar.percent}%)</span>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    bar.status === 'Occupied' ? 'bg-emerald-500' :
+                    bar.status === 'Available' ? 'bg-blue-500' :
+                    bar.status === 'Reserved' ? 'bg-amber-500' :
+                    bar.status === 'Cleaning' ? 'bg-violet-500' : 'bg-rose-500'
+                  }`}
+                  style={{ width: `${bar.percent}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
