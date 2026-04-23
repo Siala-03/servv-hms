@@ -8,8 +8,8 @@
       "type": "image/png"
     },
     {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
+      "src": "/favicon-512x512.png",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ],
