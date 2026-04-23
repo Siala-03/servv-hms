@@ -32,6 +32,16 @@ interface BookingForm {
   totalAmount: number | '';
 }
 
+type BookingType = 'confirm' | 'inquiry' | 'hold';
+type GuestMode = 'returning' | 'new';
+
+interface NewGuestForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}
+
 const emptyForm = (): BookingForm => ({
   guestId: '', roomId: '', ratePlanId: '', channel: 'Direct',
   checkInDate: '', checkOutDate: '', adults: '', children: '', totalAmount: '',
@@ -60,6 +70,9 @@ export function Reservations() {
   // Modals
   const [showNew, setShowNew]             = useState(false);
   const [formData, setFormData]           = useState<BookingForm>(emptyForm());
+  const [bookingType, setBookingType]     = useState<BookingType>('confirm');
+  const [guestMode, setGuestMode]         = useState<GuestMode>('returning');
+  const [newGuest, setNewGuest]           = useState<NewGuestForm>({ firstName: '', lastName: '', email: '', phone: '' });
   const [formError, setFormError]         = useState('');
   const [submitting, setSubmitting]       = useState(false);
 
@@ -105,6 +118,9 @@ export function Reservations() {
     if (searchParams.get('new') !== '1') return;
 
     setFormData(emptyForm());
+    setBookingType('confirm');
+    setGuestMode('returning');
+    setNewGuest({ firstName: '', lastName: '', email: '', phone: '' });
     setFormError('');
     setShowNew(true);
 
@@ -135,10 +151,27 @@ export function Reservations() {
 
   // ── New Booking submit ────────────────────────────────────────
   async function handleCreate() {
-    if (!formData.guestId || !formData.roomId || !formData.ratePlanId || !formData.checkInDate || !formData.checkOutDate) {
+    if (!formData.roomId || !formData.ratePlanId || !formData.checkInDate || !formData.checkOutDate) {
       setFormError('Please fill in all required fields.');
       return;
     }
+
+    if (guestMode === 'returning' && !formData.guestId) {
+      setFormError('Please select a returning guest or switch to New guest.');
+      return;
+    }
+
+    if (guestMode === 'new') {
+      if (!newGuest.firstName.trim() || !newGuest.lastName.trim() || !newGuest.email.trim() || !newGuest.phone.trim()) {
+        setFormError('Please fill all new guest fields.');
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newGuest.email.trim())) {
+        setFormError('Please enter a valid email address for the new guest.');
+        return;
+      }
+    }
+
     if (formData.checkOutDate <= formData.checkInDate) {
       setFormError('Check-out date must be after check-in date.');
       return;
@@ -148,12 +181,25 @@ export function Reservations() {
     try {
       await createReservation({
         ...formData,
+        bookingType,
+        guestId: guestMode === 'returning' ? formData.guestId : undefined,
+        newGuest: guestMode === 'new'
+          ? {
+              firstName: newGuest.firstName.trim(),
+              lastName: newGuest.lastName.trim(),
+              email: newGuest.email.trim().toLowerCase(),
+              phone: newGuest.phone.trim(),
+            }
+          : undefined,
         adults:      Number(formData.adults)      || 1,
         children:    Number(formData.children)    || 0,
         totalAmount: Number(formData.totalAmount) || 0,
       });
       setShowNew(false);
       setFormData(emptyForm());
+      setBookingType('confirm');
+      setGuestMode('returning');
+      setNewGuest({ firstName: '', lastName: '', email: '', phone: '' });
       reload();
     } catch (e) {
       setFormError((e as Error).message ?? 'Failed to create booking.');
@@ -406,7 +452,7 @@ export function Reservations() {
       {/* ── New Booking Modal ───────────────────────────────────── */}
       {showNew && (
         <Modal
-          title="New Booking"
+          title="Quick Booking"
           onClose={() => setShowNew(false)}
           size="lg"
           footer={
@@ -419,13 +465,77 @@ export function Reservations() {
           }
         >
           {formError && <p className="mb-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
+
+          <div className="mb-4 rounded-xl border border-slate-200 p-3 bg-slate-50">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Booking Type</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: 'confirm', label: 'Confirm' },
+                { key: 'inquiry', label: 'Inquiry' },
+                { key: 'hold', label: 'Hold' },
+              ] as const).map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setBookingType(item.key)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    bookingType === item.key
+                      ? 'bg-amber-600 border-amber-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 text-xs text-slate-500">Rooms: 1</div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Guest', (
-              <select value={formData.guestId} onChange={(e) => setFormData({ ...formData, guestId: e.target.value })} className={inputCls}>
-                <option value="">Select guest…</option>
-                {guests.map((g) => <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>)}
-              </select>
-            ), true)}
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3 bg-white">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Guest Information</p>
+              <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden mb-3">
+                <button
+                  type="button"
+                  onClick={() => setGuestMode('returning')}
+                  className={`px-3 py-1.5 text-sm font-medium ${guestMode === 'returning' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
+                >
+                  Returning
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGuestMode('new'); setFormData((p) => ({ ...p, guestId: '' })); }}
+                  className={`px-3 py-1.5 text-sm font-medium border-l border-slate-200 ${guestMode === 'new' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
+                >
+                  New
+                </button>
+              </div>
+
+              {guestMode === 'returning' ? (
+                field('Guest', (
+                  <select value={formData.guestId} onChange={(e) => setFormData({ ...formData, guestId: e.target.value })} className={inputCls}>
+                    <option value="">Select guest…</option>
+                    {guests.map((g) => <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>)}
+                  </select>
+                ), true)
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {field('First Name', (
+                    <input type="text" value={newGuest.firstName} onChange={(e) => setNewGuest({ ...newGuest, firstName: e.target.value })} className={inputCls} placeholder="Guest first name" />
+                  ), true)}
+                  {field('Last Name', (
+                    <input type="text" value={newGuest.lastName} onChange={(e) => setNewGuest({ ...newGuest, lastName: e.target.value })} className={inputCls} placeholder="Guest last name" />
+                  ), true)}
+                  {field('Email', (
+                    <input type="email" value={newGuest.email} onChange={(e) => setNewGuest({ ...newGuest, email: e.target.value })} className={inputCls} placeholder="guest@email.com" />
+                  ), true)}
+                  {field('Phone', (
+                    <input type="tel" value={newGuest.phone} onChange={(e) => setNewGuest({ ...newGuest, phone: e.target.value })} className={inputCls} placeholder="+2507..." />
+                  ), true)}
+                </div>
+              )}
+            </div>
+
             {field('Room', (
               <select value={formData.roomId} onChange={(e) => updateForm({ roomId: e.target.value })} className={inputCls}>
                 <option value="">Select room…</option>

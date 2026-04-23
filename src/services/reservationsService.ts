@@ -20,6 +20,16 @@ interface ApiReservation extends Reservation {
   room?:  { id: string; roomNumber: string; roomType: string } | null;
 }
 
+interface CreateReservationPayload extends Partial<Reservation> {
+  bookingType?: 'confirm' | 'inquiry' | 'hold';
+  newGuest?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+}
+
 const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 const currFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -92,7 +102,7 @@ export async function getReservation(id: string): Promise<ApiReservation> {
   return api.get<ApiReservation>(`/api/reservations/${id}`);
 }
 
-export async function createReservation(payload: Partial<Reservation>): Promise<ApiReservation> {
+export async function createReservation(payload: CreateReservationPayload): Promise<ApiReservation> {
   return api.post<ApiReservation>('/api/reservations', payload);
 }
 

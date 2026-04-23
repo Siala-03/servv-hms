@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../lib/supabase';
+import { AuthRequest } from '../middleware/authenticate';
 import {
   sendBookingConfirmation,
   sendCheckinWelcome,
@@ -65,6 +66,12 @@ const JOIN_QUERY = `
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
 
+function normalizeBookingType(value: unknown): 'confirm' | 'inquiry' | 'hold' | null {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (v === 'confirm' || v === 'inquiry' || v === 'hold') return v;
+  return null;
+}
+
 // GET /api/reservations?status=&channel=
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -102,7 +109,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/reservations
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const b = req.body as Record<string, unknown>;
 
@@ -111,14 +118,62 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
+    const bookingType = normalizeBookingType(b.bookingType);
+    const newGuest = (b.newGuest ?? null) as Record<string, unknown> | null;
+
+    let guestId = String(b.guestId ?? '').trim();
+    if (!guestId && newGuest) {
+      const firstName = String(newGuest.firstName ?? '').trim();
+      const lastName = String(newGuest.lastName ?? '').trim();
+      const email = String(newGuest.email ?? '').trim().toLowerCase();
+      const phone = String(newGuest.phone ?? '').trim();
+
+      if (!firstName || !lastName || !email || !phone) {
+        res.status(400).json({ error: 'newGuest requires firstName, lastName, email, and phone' });
+        return;
+      }
+
+      const { data: createdGuest, error: guestError } = await supabase
+        .from('guests')
+        .insert({
+          hotel_id: req.hotelId ?? null,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          phone,
+        })
+        .select('id')
+        .single();
+
+      if (guestError || !createdGuest) throw new Error(guestError?.message ?? 'Failed to create guest');
+      guestId = createdGuest.id;
+    }
+
+    if (!guestId) {
+      res.status(400).json({ error: 'guestId is required unless newGuest is provided' });
+      return;
+    }
+
+    const resolvedStatus = bookingType === 'confirm'
+      ? 'Confirmed'
+      : bookingType === 'inquiry' || bookingType === 'hold'
+        ? 'Pending'
+        : (b.status as string | undefined) ?? 'Pending';
+
+    const resolvedChannel = bookingType === 'inquiry'
+      ? 'Inquiry'
+      : bookingType === 'hold'
+        ? 'Hold'
+        : (b.channel as string | undefined) ?? 'Direct';
+
     const { data, error } = await supabase
       .from('reservations')
       .insert({
-        guest_id:      b.guestId,
+        guest_id:      guestId,
         room_id:       b.roomId,
         rate_plan_id:  b.ratePlanId,
-        channel:       b.channel,
-        status:        b.status ?? 'Pending',
+        channel:       resolvedChannel,
+        status:        resolvedStatus,
         check_in_date: b.checkInDate,
         check_out_date: b.checkOutDate,
         adults:        b.adults ?? 1,

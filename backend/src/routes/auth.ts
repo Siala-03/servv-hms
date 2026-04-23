@@ -37,29 +37,47 @@ router.post('/login', async (req, res, next) => {
     if (!username?.trim() || !password) throw new HttpError(400, 'Username and password are required');
 
     // Find credentials
-    let credQuery = supabase
+    const { data: creds, error: credErr } = await supabase
       .from('hotel_user_credentials')
       .select('user_id, password_hash, hotel_id')
       .eq('username', username.trim());
 
+    if (credErr) throw new HttpError(500, credErr.message);
+    if (!creds || creds.length === 0) throw new HttpError(401, 'Invalid username or password');
+
+    let cred = null as (typeof creds[number]) | null;
+
     if (hotelId) {
-      credQuery = credQuery.eq('hotel_id', hotelId);
+      cred = creds.find((c) => c.hotel_id === hotelId) ?? null;
+      if (!cred) throw new HttpError(401, 'Invalid username, password, or hotel ID');
+      const valid = await bcrypt.compare(password, cred.password_hash);
+      if (!valid) throw new HttpError(401, 'Invalid username, password, or hotel ID');
+    } else if (creds.length === 1) {
+      const only = creds[0];
+      const valid = await bcrypt.compare(password, only.password_hash);
+      if (!valid) throw new HttpError(401, 'Invalid username or password');
+      cred = only;
     } else {
-      // No hotelId → try superadmin first (hotel_id IS NULL)
-      credQuery = credQuery.is('hotel_id', null);
+      // Same username exists in multiple hotels. Try matching password first.
+      const matches: typeof creds = [];
+      for (const c of creds) {
+        // eslint-disable-next-line no-await-in-loop
+        const ok = await bcrypt.compare(password, c.password_hash);
+        if (ok) matches.push(c);
+      }
+
+      if (matches.length === 0) throw new HttpError(401, 'Invalid username or password');
+      if (matches.length > 1) {
+        throw new HttpError(400, 'This username exists in multiple hotels. Please enter your Hotel ID.');
+      }
+      cred = matches[0];
     }
-
-    const { data: cred } = await credQuery.maybeSingle();
-    if (!cred) throw new HttpError(401, 'Invalid username or password');
-
-    const valid = await bcrypt.compare(password, cred.password_hash);
-    if (!valid) throw new HttpError(401, 'Invalid username or password');
 
     // Fetch full user + hotel info
     const { data: user } = await supabase
       .from('hotel_users')
       .select('*')
-      .eq('id', cred.user_id)
+      .eq('id', cred!.user_id)
       .maybeSingle();
 
     if (!user || !user.is_active) throw new HttpError(401, 'Account not found or deactivated');

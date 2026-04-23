@@ -1,12 +1,12 @@
 import { Resend } from 'resend';
 import { buildTicketHtml, TicketData, buildCheckoutReceiptHtml, CheckoutReceiptData } from './ticket';
 
-const resend     = new Resend(process.env.RESEND_API_KEY);
+const resend     = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.EMAIL_FROM ?? 'bookings@servv.co';
 const HOTEL_NAME = process.env.HOTEL_NAME ?? 'SERVV Hotel';
 
 export async function sendBookingTicketEmail(data: TicketData): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend) {
     console.warn('[Email] RESEND_API_KEY not set — skipping email.');
     return;
   }
@@ -30,7 +30,7 @@ export async function sendBookingTicketEmail(data: TicketData): Promise<void> {
 }
 
 export async function sendCheckoutReceiptEmail(data: CheckoutReceiptData): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend) {
     console.warn('[Email] RESEND_API_KEY not set — skipping checkout receipt.');
     return;
   }
