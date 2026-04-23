@@ -16,6 +16,7 @@ import webhookRouter      from './routes/webhook';
 import publicRouter       from './routes/public';
 import authRouter         from './routes/auth';
 import adminRouter        from './routes/admin';
+import notificationsRouter from './routes/notifications';
 
 import { authenticate, AuthRequest } from './middleware/authenticate';
 import { errorHandler, notFound }    from './middleware/errorHandler';
@@ -75,6 +76,7 @@ app.use('/api/housekeeping', housekeepingRouter);
 app.use('/api/orders',       ordersRouter);
 app.use('/api/channels',     channelsRouter);
 app.use('/api/intelligence', intelligenceRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/api/whatsapp',     whatsappRouter);
 app.use('/api/webhook',      webhookRouter);
 app.use('/api/public',       publicRouter);

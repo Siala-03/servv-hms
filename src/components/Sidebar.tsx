@@ -1,28 +1,68 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, Network, ConciergeBell,
   Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3, BedDouble,
-  LogOut, ShieldCheck, UserCog, Brain, Menu, X,
+  LogOut, ShieldCheck, UserCog, Brain, Bell, Menu, X, ChevronDown, Blocks,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS, UserRole, canAccess } from '../lib/rbac';
 import { BrandLogo } from './BrandLogo';
 
-const NAV_ITEMS = [
-  { name: 'Dashboard',       path: '/dashboard',    icon: LayoutDashboard },
-  { name: 'Reservations',    path: '/reservations', icon: CalendarDays    },
-  { name: 'Channel Manager', path: '/channels',     icon: Network         },
-  { name: 'Front Desk',      path: '/front-desk',   icon: ConciergeBell   },
-  { name: 'Rooms',           path: '/rooms',        icon: BedDouble       },
-  { name: 'Guests',          path: '/guests',       icon: Users           },
-  { name: 'Orders',          path: '/orders',       icon: UtensilsCrossed },
-  { name: 'Housekeeping',    path: '/housekeeping', icon: Sparkles        },
-  { name: 'Staff',           path: '/staff',        icon: UserCircle      },
-  { name: 'Reports',         path: '/reports',      icon: BarChart3       },
-  { name: 'Intelligence',    path: '/intelligence', icon: Brain           },
-  { name: 'User Accounts',   path: '/users',        icon: UserCog         },
-  { name: 'Hotels',          path: '/superadmin',   icon: ShieldCheck     },
+type NavItem = {
+  name: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+type NavGroup = {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: NavItem[];
+};
+
+const TOP_LEVEL_ITEMS: NavItem[] = [
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+];
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    name: 'Operations',
+    icon: ConciergeBell,
+    items: [
+      { name: 'Front Desk', path: '/front-desk', icon: ConciergeBell },
+      { name: 'Rooms', path: '/rooms', icon: BedDouble },
+      { name: 'Housekeeping', path: '/housekeeping', icon: Sparkles },
+      { name: 'Orders', path: '/orders', icon: UtensilsCrossed },
+    ],
+  },
+  {
+    name: 'Bookings',
+    icon: CalendarDays,
+    items: [
+      { name: 'Reservations', path: '/reservations', icon: CalendarDays },
+      { name: 'Channel Manager', path: '/channels', icon: Network },
+      { name: 'Guests', path: '/guests', icon: Users },
+    ],
+  },
+  {
+    name: 'Insights',
+    icon: BarChart3,
+    items: [
+      { name: 'Notifications', path: '/notifications', icon: Bell },
+      { name: 'Reports', path: '/reports', icon: BarChart3 },
+      { name: 'Intelligence', path: '/intelligence', icon: Brain },
+    ],
+  },
+  {
+    name: 'Administration',
+    icon: Blocks,
+    items: [
+      { name: 'Staff', path: '/staff', icon: UserCircle },
+      { name: 'User Accounts', path: '/users', icon: UserCog },
+      { name: 'Hotels', path: '/superadmin', icon: ShieldCheck },
+    ],
+  },
 ];
 
 const ROLE_BADGE: Record<UserRole, string> = {
@@ -36,9 +76,17 @@ const ROLE_BADGE: Record<UserRole, string> = {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate         = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  const visible = NAV_ITEMS.filter((item) => canAccess(user?.role, item.path));
+  const visibleTopLevel = TOP_LEVEL_ITEMS.filter((item) => canAccess(user?.role, item.path));
+  const visibleGroups = NAV_GROUPS
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canAccess(user?.role, item.path)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   function handleLogout() {
     logout();
@@ -71,7 +119,7 @@ export function Sidebar() {
       </div>
 
       <nav className="relative flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        {visible.map((item) => {
+        {visibleTopLevel.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -92,6 +140,67 @@ export function Sidebar() {
               </span>
               <span className="font-medium text-[13px] tracking-[0.01em]">{item.name}</span>
             </NavLink>
+          );
+        })}
+
+        {visibleGroups.map((group) => {
+          const GroupIcon = group.icon;
+          const groupActive = group.items.some((item) => location.pathname.startsWith(item.path));
+          const isExpanded = expandedGroups[group.name] ?? groupActive;
+
+          return (
+            <div key={group.name} className="rounded-xl border border-slate-800/70 bg-slate-900/35 overflow-hidden">
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    const defaultPath = group.items[0]?.path;
+                    if (defaultPath) navigate(defaultPath);
+                    setExpandedGroups((prev) => ({ ...prev, [group.name]: true }));
+                    setMobileOpen(false);
+                  }}
+                  className={`flex-1 flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                    groupActive ? 'text-white bg-amber-500/10' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <span className="w-8 h-8 rounded-lg bg-slate-900/70 border border-slate-700/70 flex items-center justify-center">
+                    <GroupIcon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium text-[13px] tracking-[0.01em]">{group.name}</span>
+                </button>
+                <button
+                  onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.name]: !isExpanded }))}
+                  className="px-2.5 py-2.5 text-slate-400 hover:text-white"
+                  aria-label={`Toggle ${group.name}`}
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {isExpanded && (
+                <div className="pb-2 px-2 space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.name}
+                        to={item.path}
+                        onClick={() => setMobileOpen(false)}
+                        className={({ isActive }) =>
+                          `ml-10 flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] transition-all ${
+                            isActive
+                              ? 'bg-amber-500/15 text-white border border-amber-500/25'
+                              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                          }`
+                        }
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="font-medium">{item.name}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>

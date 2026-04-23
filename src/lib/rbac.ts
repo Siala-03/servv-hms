@@ -24,6 +24,7 @@ export const ROUTE_ROLES: Record<string, UserRole[]> = {
   '/intelligence': ['superadmin', 'manager'],
   '/users':        ['superadmin', 'manager'],
   '/superadmin':   ['superadmin'],
+  '/notifications': ['superadmin', 'manager', 'front_desk'],
 };
 
 export function canAccess(role: UserRole | undefined, path: string): boolean {
