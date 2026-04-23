@@ -9,6 +9,20 @@ export async function createRoom(payload: Partial<Room> & { hotelId?: string }):
   return api.post<Room>('/api/rooms', payload);
 }
 
+export async function createRoomsBulk(payload: {
+  floor: number;
+  startNumber: number;
+  endNumber: number;
+  padTo?: number;
+  prefix?: string;
+  roomType: string;
+  baseRate?: number;
+  status?: RoomStatus;
+  maxOccupancy?: number;
+}): Promise<{ created: number; rooms: Room[] }> {
+  return api.post<{ created: number; rooms: Room[] }>('/api/rooms/bulk', payload);
+}
+
 export async function getRoom(id: string): Promise<Room> {
   return api.get<Room>(`/api/rooms/${id}`);
 }

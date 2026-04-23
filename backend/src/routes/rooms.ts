@@ -59,6 +59,66 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
   }
 });
 
+// POST /api/rooms/bulk
+router.post('/bulk', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const body = req.body as Record<string, unknown>;
+    const hotelId = resolveHotelId(req, body.hotelId);
+    if (!hotelId) {
+      res.status(400).json({ error: 'hotelId is required' });
+      return;
+    }
+
+    const floor = Number(body.floor ?? 1);
+    const start = Number(body.startNumber);
+    const end = Number(body.endNumber);
+    const padTo = Number(body.padTo ?? 0);
+    const prefix = String(body.prefix ?? '').trim();
+    const roomType = String(body.roomType ?? '').trim();
+    const baseRate = Number(body.baseRate ?? 0);
+    const maxOccupancy = Number(body.maxOccupancy ?? 2);
+    const status = String(body.status ?? 'Available');
+
+    if (!roomType) {
+      res.status(400).json({ error: 'roomType is required' });
+      return;
+    }
+
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < 0 || end < start) {
+      res.status(400).json({ error: 'startNumber and endNumber must be valid integers, with endNumber >= startNumber' });
+      return;
+    }
+
+    const numbers = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    const roomRows = numbers.map((n) => {
+      const num = padTo > 0 ? String(n).padStart(padTo, '0') : String(n);
+      return {
+        hotel_id: hotelId,
+        room_number: `${prefix}${num}`,
+        room_type: roomType,
+        floor,
+        base_rate: baseRate,
+        status,
+        max_occupancy: maxOccupancy,
+      };
+    });
+
+    const { data, error } = await supabase
+      .from('rooms')
+      .insert(roomRows)
+      .select();
+
+    if (error) throw new Error(error.message);
+
+    res.status(201).json({
+      created: data?.length ?? 0,
+      rooms: (data ?? []).map(toRoom),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/rooms
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

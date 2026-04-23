@@ -1,16 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Building2, BedDouble, Layers, PencilLine, Trash2 } from 'lucide-react';
+import { Plus, Building2, BedDouble, Layers, PencilLine, Trash2, Rows3 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Room, RoomStatus } from '../domain/models';
-import { createRoom, deleteRoom, listRooms, updateRoom } from '../services/roomsService';
+import { createRoom, createRoomsBulk, deleteRoom, listRooms, updateRoom } from '../services/roomsService';
 
 interface RoomForm {
   roomNumber: string;
   roomType: string;
   floor: number | '';
+  baseRate: number | '';
+  status: RoomStatus;
+  maxOccupancy: number | '';
+}
+
+interface BulkRoomForm {
+  floor: number | '';
+  startNumber: number | '';
+  endNumber: number | '';
+  padTo: number | '';
+  prefix: string;
+  roomType: string;
   baseRate: number | '';
   status: RoomStatus;
   maxOccupancy: number | '';
@@ -27,6 +39,18 @@ const emptyForm: RoomForm = {
   maxOccupancy: '',
 };
 
+const emptyBulkForm: BulkRoomForm = {
+  floor: '',
+  startNumber: '',
+  endNumber: '',
+  padTo: 0,
+  prefix: '',
+  roomType: '',
+  baseRate: '',
+  status: 'Available',
+  maxOccupancy: '',
+};
+
 const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500';
 
 export function Rooms() {
@@ -37,10 +61,13 @@ export function Rooms() {
   const [floorFilter, setFloorFilter] = useState<string>('all');
 
   const [openModal, setOpenModal] = useState(false);
+  const [openBulkModal, setOpenBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Room | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null);
   const [form, setForm] = useState<RoomForm>(emptyForm);
+  const [bulkForm, setBulkForm] = useState<BulkRoomForm>(emptyBulkForm);
   const [formError, setFormError] = useState('');
+  const [bulkError, setBulkError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const reload = async () => {
@@ -93,6 +120,12 @@ export function Rooms() {
     setForm(emptyForm);
     setFormError('');
     setOpenModal(true);
+  }
+
+  function openBulkCreate() {
+    setBulkForm(emptyBulkForm);
+    setBulkError('');
+    setOpenBulkModal(true);
   }
 
   function openEdit(room: Room) {
@@ -156,18 +189,68 @@ export function Rooms() {
     }
   }
 
+  async function submitBulkForm() {
+    if (
+      bulkForm.floor === '' ||
+      bulkForm.startNumber === '' ||
+      bulkForm.endNumber === '' ||
+      !bulkForm.roomType.trim() ||
+      bulkForm.maxOccupancy === ''
+    ) {
+      setBulkError('Floor, start/end numbers, room type, and max occupancy are required.');
+      return;
+    }
+
+    if (Number(bulkForm.endNumber) < Number(bulkForm.startNumber)) {
+      setBulkError('End number must be greater than or equal to start number.');
+      return;
+    }
+
+    setSubmitting(true);
+    setBulkError('');
+    try {
+      await createRoomsBulk({
+        floor: Number(bulkForm.floor),
+        startNumber: Number(bulkForm.startNumber),
+        endNumber: Number(bulkForm.endNumber),
+        padTo: Number(bulkForm.padTo) || 0,
+        prefix: bulkForm.prefix.trim(),
+        roomType: bulkForm.roomType.trim(),
+        baseRate: Number(bulkForm.baseRate) || 0,
+        status: bulkForm.status,
+        maxOccupancy: Number(bulkForm.maxOccupancy),
+      });
+
+      setOpenBulkModal(false);
+      setBulkForm(emptyBulkForm);
+      await reload();
+    } catch (e) {
+      setBulkError((e as Error).message ?? 'Failed to create rooms in bulk.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
       <PageHeader
         title="Rooms & Floors"
         subtitle="Manage room inventory, floor assignments, and room settings."
         actions={
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> Add Room
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openBulkCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
+            >
+              <Rows3 className="w-4 h-4" /> Bulk Add
+            </button>
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" /> Add Room
+            </button>
+          </div>
         }
       />
 
@@ -325,6 +408,76 @@ export function Rooms() {
               </select>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {openBulkModal && (
+        <Modal
+          title="Bulk Add Rooms"
+          onClose={() => { setOpenBulkModal(false); setBulkForm(emptyBulkForm); }}
+          size="lg"
+          footer={
+            <>
+              <button
+                onClick={() => { setOpenBulkModal(false); setBulkForm(emptyBulkForm); }}
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitBulkForm}
+                disabled={submitting}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50"
+              >
+                {submitting ? 'Creating...' : 'Create Rooms'}
+              </button>
+            </>
+          }
+        >
+          {bulkError && <p className="mb-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{bulkError}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Floor *</label>
+              <input type="number" min={1} className={inputCls} value={bulkForm.floor} onChange={(e) => setBulkForm({ ...bulkForm, floor: e.target.value === '' ? '' : Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Room Type *</label>
+              <input className={inputCls} value={bulkForm.roomType} onChange={(e) => setBulkForm({ ...bulkForm, roomType: e.target.value })} placeholder="Standard Queen" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Start Number *</label>
+              <input type="number" min={0} className={inputCls} value={bulkForm.startNumber} onChange={(e) => setBulkForm({ ...bulkForm, startNumber: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="101" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">End Number *</label>
+              <input type="number" min={0} className={inputCls} value={bulkForm.endNumber} onChange={(e) => setBulkForm({ ...bulkForm, endNumber: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="120" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Prefix</label>
+              <input className={inputCls} value={bulkForm.prefix} onChange={(e) => setBulkForm({ ...bulkForm, prefix: e.target.value })} placeholder="A-" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Pad Digits</label>
+              <input type="number" min={0} max={6} className={inputCls} value={bulkForm.padTo} onChange={(e) => setBulkForm({ ...bulkForm, padTo: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="3" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Base Rate (USD)</label>
+              <input type="number" min={0} step="0.01" className={inputCls} value={bulkForm.baseRate} onChange={(e) => setBulkForm({ ...bulkForm, baseRate: e.target.value === '' ? '' : Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Max Occupancy *</label>
+              <input type="number" min={1} max={12} className={inputCls} value={bulkForm.maxOccupancy} onChange={(e) => setBulkForm({ ...bulkForm, maxOccupancy: e.target.value === '' ? '' : Number(e.target.value) })} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
+              <select className={inputCls} value={bulkForm.status} onChange={(e) => setBulkForm({ ...bulkForm, status: e.target.value as RoomStatus })}>
+                {ROOM_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Preview: creates room numbers from start to end using optional prefix/padding.
+          </p>
         </Modal>
       )}
 
