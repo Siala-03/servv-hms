@@ -5,6 +5,10 @@ export async function listRooms(): Promise<Room[]> {
   return api.get<Room[]>('/api/rooms');
 }
 
+export async function createRoom(payload: Partial<Room> & { hotelId?: string }): Promise<Room> {
+  return api.post<Room>('/api/rooms', payload);
+}
+
 export async function getRoom(id: string): Promise<Room> {
   return api.get<Room>(`/api/rooms/${id}`);
 }
@@ -15,4 +19,8 @@ export async function updateRoomStatus(id: string, status: RoomStatus): Promise<
 
 export async function updateRoom(id: string, payload: Partial<Room>): Promise<Room> {
   return api.put<Room>(`/api/rooms/${id}`, payload);
+}
+
+export async function deleteRoom(id: string): Promise<void> {
+  return api.delete<void>(`/api/rooms/${id}`);
 }

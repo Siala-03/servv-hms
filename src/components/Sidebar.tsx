@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarDays, Network, ConciergeBell,
-  Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3,
+  Users, UserCircle, UtensilsCrossed, Sparkles, BarChart3, BedDouble,
   LogOut, ShieldCheck, UserCog, Brain, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { name: 'Reservations',    path: '/reservations', icon: CalendarDays    },
   { name: 'Channel Manager', path: '/channels',     icon: Network         },
   { name: 'Front Desk',      path: '/front-desk',   icon: ConciergeBell   },
+  { name: 'Rooms',           path: '/rooms',        icon: BedDouble       },
   { name: 'Guests',          path: '/guests',       icon: Users           },
   { name: 'Orders',          path: '/orders',       icon: UtensilsCrossed },
   { name: 'Housekeeping',    path: '/housekeeping', icon: Sparkles        },

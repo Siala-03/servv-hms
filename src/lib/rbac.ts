@@ -15,6 +15,7 @@ export const ROUTE_ROLES: Record<string, UserRole[]> = {
   '/reservations': ['superadmin', 'manager', 'front_desk'],
   '/channels':     ['superadmin', 'manager'],
   '/front-desk':   ['superadmin', 'manager', 'front_desk'],
+  '/rooms':        ['superadmin', 'manager', 'front_desk'],
   '/guests':       ['superadmin', 'manager', 'front_desk'],
   '/staff':        ['superadmin', 'manager'],
   '/orders':       ['superadmin', 'manager', 'front_desk', 'fnb'],

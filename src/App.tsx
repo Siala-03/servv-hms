@@ -15,6 +15,7 @@ import { Reservations }   from './pages/Reservations';
 import { ChannelManager } from './pages/ChannelManager';
 import { FrontDesk }      from './pages/FrontDesk';
 import { Guests }         from './pages/Guests';
+import { Rooms }          from './pages/Rooms';
 import { Staff }          from './pages/Staff';
 import { Orders }         from './pages/Orders';
 import { Housekeeping }   from './pages/Housekeeping';
@@ -69,6 +70,7 @@ export function App() {
               <Route path="reservations"  element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
               <Route path="channels"      element={<ProtectedRoute><ChannelManager /></ProtectedRoute>} />
               <Route path="front-desk"    element={<ProtectedRoute><FrontDesk /></ProtectedRoute>} />
+              <Route path="rooms"         element={<ProtectedRoute><Rooms /></ProtectedRoute>} />
               <Route path="guests"        element={<ProtectedRoute><Guests /></ProtectedRoute>} />
               <Route path="staff"         element={<ProtectedRoute><Staff /></ProtectedRoute>} />
               <Route path="orders"        element={<ProtectedRoute><Orders /></ProtectedRoute>} />
