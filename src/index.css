@@ -1,5 +1,5 @@
 /* @import url() FONT IMPORTS MUST ALWAYS BE AT THE VERY TOP OF THIS FILE, ABOVE THE TAILWIND IMPORTS — DO NOT DELETE THIS COMMENT */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cormorant+Garamond:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /* CRITICAL: THE FOLLOWING TAILWIND IMPORTS MUST NEVER BE DELETED OR REORDERED — DO NOT DELETE THIS COMMENT */
 @import 'tailwindcss/base';
@@ -9,13 +9,15 @@
 /* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
 
 :root {
-  --brand-amber-500: #f59e0b;
-  --brand-amber-600: #d97706;
-  --brand-amber-700: #b45309;
-  --brand-slate-950: #020617;
-  --surface-base: #f7f9fc;
+  --brand-500: #f59e0b;
+  --brand-600: #d97706;
+  --brand-700: #b45309;
+  --sidebar-bg: #0E0E16;
+  --surface-base: #F4F3F1;
   --surface-card: #ffffff;
-  --text-main: #0f172a;
+  --text-primary: #111111;
+  --text-secondary: #737373;
+  --border-ui: #E5E5E5;
 }
 
 * {
@@ -29,39 +31,37 @@ body,
 }
 
 body {
-  font-family: 'DM Sans', sans-serif;
-  color: var(--text-main);
-  background: #fafaf9;
-  letter-spacing: 0.004em;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-primary);
+  background: var(--surface-base);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-
 h1,
 h2,
 h3 {
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: -0.01em;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.02em;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 ::selection {
-  background: rgba(245, 158, 11, 0.2);
-  color: #0b1220;
+  background: rgba(245, 158, 11, 0.15);
+  color: #111111;
 }
 
 .luxury-panel {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #E5E5E5;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .luxury-panel-spotlight {
   position: relative;
   overflow: hidden;
 }
-
 
 .brand-btn {
   position: relative;
@@ -72,9 +72,9 @@ h3 {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
   transform: translateX(-130%);
-  transition: transform 480ms ease;
+  transition: transform 400ms ease;
 }
 
 .brand-btn:hover::before {
@@ -83,30 +83,30 @@ h3 {
 
 .hero-banner {
   position: relative;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: #141414;
-  box-shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.5);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, #0E0E16 0%, #181e2e 100%);
+  box-shadow: 0 8px 30px -10px rgba(0, 0, 0, 0.4);
 }
 
 .hero-chip {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f1f5f9;
 }
 
 .headline-accent {
-  color: #0f172a;
+  color: #111111;
 }
 
 .focus-ring {
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
 }
 
 .focus-ring:focus-visible {
   outline: none;
-  border-color: rgba(100, 116, 139, 0.5);
-  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
 }
 
 .table-shell {
@@ -116,11 +116,11 @@ h3 {
 }
 
 .table-shell::-webkit-scrollbar {
-  height: 8px;
+  height: 5px;
 }
 
 .table-shell::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
+  background: #D4D4D4;
   border-radius: 999px;
 }
 
@@ -134,17 +134,23 @@ h3 {
 
 .table-premium th,
 .table-premium td {
-  padding: 0.75rem 0.9rem;
+  padding: 0.75rem 1rem;
   vertical-align: middle;
 }
 
 .table-premium th {
   white-space: nowrap;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #737373;
 }
 
 .table-premium td {
   word-break: break-word;
+  font-size: 13px;
+  color: #404040;
 }
 
 .table-truncate {
@@ -160,6 +166,6 @@ h3 {
 
   .table-premium th,
   .table-premium td {
-    padding: 0.65rem 0.75rem;
+    padding: 0.625rem 0.875rem;
   }
 }

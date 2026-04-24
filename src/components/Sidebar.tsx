@@ -76,12 +76,12 @@ const ROLE_BADGE: Record<UserRole, string> = {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate         = useNavigate();
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const location         = useLocation();
+  const [mobileOpen, setMobileOpen]       = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const visibleTopLevel = TOP_LEVEL_ITEMS.filter((item) => canAccess(user?.role, item.path));
-  const visibleGroups = NAV_GROUPS
+  const visibleGroups   = NAV_GROUPS
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => canAccess(user?.role, item.path)),
@@ -98,27 +98,29 @@ export function Sidebar() {
     : '?';
 
   const panelContent = (
-    <aside className="w-72 bg-slate-950/95 text-slate-300 flex flex-col h-full border-r border-slate-800/80 shadow-[10px_0_35px_-28px_rgba(2,6,23,0.95)] backdrop-blur-xl">
+    <aside className="w-64 bg-[#0E0E16] text-zinc-400 flex flex-col h-full border-r border-white/[0.06]">
 
-      <div className="relative px-6 pt-6 pb-4 flex flex-col items-start gap-3 border-b border-slate-800/80">
-        {/* Close button — mobile only */}
+      {/* ── Header ── */}
+      <div className="relative px-4 pt-5 pb-4 flex flex-col items-start gap-2.5 border-b border-white/[0.06]">
         <button
-          className="lg:hidden absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1"
+          className="lg:hidden absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors p-1"
           onClick={() => setMobileOpen(false)}
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
-
-        <BrandLogo variant="light" className="h-7" />
+        <BrandLogo variant="light" className="h-6" />
         <div className="w-full pr-6 lg:pr-0">
-          <span className="text-white font-semibold text-sm leading-snug block break-words">
+          <span className="text-white font-semibold text-[13px] leading-snug block">
             {user?.hotelName ?? 'SERVV HMS'}
           </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-slate-500 block mt-0.5">Property</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-zinc-600 block mt-0.5">Property</span>
         </div>
       </div>
 
-      <nav className="relative flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
+      {/* ── Nav ── */}
+      <nav className="flex-1 px-2 py-3 overflow-y-auto">
+
+        {/* Top-level items */}
         {visibleTopLevel.map((item) => {
           const Icon = item.icon;
           return (
@@ -128,56 +130,41 @@ export function Sidebar() {
               end={item.path === '/dashboard'}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+                `flex items-center gap-2.5 px-3 py-[7px] rounded-md text-[13px] font-medium transition-colors mb-0.5 ${
                   isActive
-                    ? 'bg-amber-500/10 text-white border border-amber-500/25'
-                    : 'border border-transparent hover:bg-white/5 hover:text-white hover:border-white/8'
+                    ? 'bg-white/[0.08] text-white'
+                    : 'hover:bg-white/[0.05] hover:text-zinc-200'
                 }`
               }
             >
-              <span className="w-8 h-8 rounded-lg bg-slate-900/70 border border-slate-700/70 flex items-center justify-center group-hover:border-slate-600 transition-colors">
-                <Icon className="w-4 h-4" />
-              </span>
-              <span className="font-medium text-[13px] tracking-[0.01em]">{item.name}</span>
+              <Icon className="w-[15px] h-[15px] shrink-0" />
+              {item.name}
             </NavLink>
           );
         })}
 
+        {/* Group sections */}
         {visibleGroups.map((group) => {
-          const GroupIcon = group.icon;
           const groupActive = group.items.some((item) => location.pathname.startsWith(item.path));
-          const isExpanded = expandedGroups[group.name] ?? groupActive;
+          const isExpanded  = expandedGroups[group.name] ?? groupActive;
 
           return (
-            <div key={group.name} className="rounded-xl border border-slate-800/70 bg-slate-900/35 overflow-hidden">
-              <div className="flex items-center">
-                <button
-                  onClick={() => {
-                    const defaultPath = group.items[0]?.path;
-                    if (defaultPath) navigate(defaultPath);
-                    setExpandedGroups((prev) => ({ ...prev, [group.name]: true }));
-                    setMobileOpen(false);
-                  }}
-                  className={`flex-1 flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                    groupActive ? 'text-white bg-amber-500/10' : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <span className="w-8 h-8 rounded-lg bg-slate-900/70 border border-slate-700/70 flex items-center justify-center">
-                    <GroupIcon className="w-4 h-4" />
-                  </span>
-                  <span className="font-medium text-[13px] tracking-[0.01em]">{group.name}</span>
-                </button>
+            <div key={group.name} className="mt-5">
+              <div className="flex items-center justify-between px-3 mb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
+                  {group.name}
+                </span>
                 <button
                   onClick={() => setExpandedGroups((prev) => ({ ...prev, [group.name]: !isExpanded }))}
-                  className="px-2.5 py-2.5 text-slate-400 hover:text-white"
+                  className="text-zinc-700 hover:text-zinc-400 transition-colors p-0.5 -mr-0.5"
                   aria-label={`Toggle ${group.name}`}
                 >
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`} />
                 </button>
               </div>
 
               {isExpanded && (
-                <div className="pb-2 px-2 space-y-1">
+                <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     return (
@@ -186,15 +173,15 @@ export function Sidebar() {
                         to={item.path}
                         onClick={() => setMobileOpen(false)}
                         className={({ isActive }) =>
-                          `ml-10 flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] transition-all ${
+                          `flex items-center gap-2.5 px-3 py-[7px] rounded-md text-[13px] font-medium transition-colors ${
                             isActive
-                              ? 'bg-amber-500/15 text-white border border-amber-500/25'
-                              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                              ? 'bg-white/[0.08] text-white'
+                              : 'text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200'
                           }`
                         }
                       >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="font-medium">{item.name}</span>
+                        <Icon className="w-[15px] h-[15px] shrink-0" />
+                        {item.name}
                       </NavLink>
                     );
                   })}
@@ -205,25 +192,26 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="relative p-4 border-t border-slate-800/80">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-900/55 border border-slate-800">
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-semibold text-xs shrink-0">
+      {/* ── User profile ── */}
+      <div className="p-3 border-t border-white/[0.06]">
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md bg-white/[0.04] border border-white/[0.05]">
+          <div className="w-7 h-7 rounded-full bg-amber-500/20 border border-amber-500/25 flex items-center justify-center text-amber-400 font-semibold text-[11px] shrink-0">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
+            <p className="text-[13px] font-medium text-white truncate leading-snug">
               {user ? `${user.firstName} ${user.lastName}` : '—'}
             </p>
-            <p className={`text-xs truncate font-medium ${ROLE_BADGE[user?.role ?? 'manager']}`}>
+            <p className={`text-[10px] truncate leading-snug ${ROLE_BADGE[user?.role ?? 'manager']}`}>
               {user ? ROLE_LABELS[user.role] : ''}
             </p>
           </div>
           <button
             onClick={handleLogout}
             title="Sign out"
-            className="shrink-0 text-slate-400 hover:text-white transition-colors p-1"
+            className="shrink-0 text-zinc-600 hover:text-zinc-300 transition-colors"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -232,34 +220,34 @@ export function Sidebar() {
 
   return (
     <>
-      {/* ── Mobile hamburger button ── */}
+      {/* ── Mobile hamburger ── */}
       <button
-        className="lg:hidden fixed top-3.5 left-4 z-40 w-9 h-9 flex items-center justify-center bg-slate-900 text-white rounded-lg shadow-lg border border-slate-700"
+        className="lg:hidden fixed top-3.5 left-4 z-40 w-9 h-9 flex items-center justify-center bg-[#0E0E16] text-white rounded-lg shadow-lg border border-white/[0.1]"
         onClick={() => setMobileOpen(true)}
         aria-label="Open menu"
       >
-        <Menu className="w-5 h-5" />
+        <Menu className="w-4 h-4" />
       </button>
 
       {/* ── Mobile backdrop ── */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* ── Mobile slide-in drawer ── */}
+      {/* ── Mobile drawer ── */}
       <div
-        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {panelContent}
       </div>
 
-      {/* ── Desktop sidebar (always visible) ── */}
-      <div className="hidden lg:block sticky top-0 h-screen shrink-0 w-72">
+      {/* ── Desktop sidebar ── */}
+      <div className="hidden lg:block sticky top-0 h-screen shrink-0 w-64">
         {panelContent}
       </div>
     </>

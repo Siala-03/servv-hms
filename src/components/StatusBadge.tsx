@@ -1,33 +1,18 @@
 import React from 'react';
+
 type StatusType =
-'Confirmed' |
-'Pending' |
-'Cancelled' |
-'Checked-in' |
-'Checked-out' |
-'Available' |
-'Occupied' |
-'Cleaning' |
-'Maintenance' |
-'Reserved' |
-'Open' |
-'In Progress' |
-'Resolved' |
-'New' |
-'Preparing' |
-'Delivered' |
-'Urgent' |
-'High' |
-'Normal' |
-'Low' |
-'Connected' |
-'Disconnected' |
-'Syncing';
+  | 'Confirmed' | 'Pending' | 'Cancelled' | 'Checked-in' | 'Checked-out'
+  | 'Available' | 'Occupied' | 'Cleaning' | 'Maintenance' | 'Reserved'
+  | 'Open' | 'In Progress' | 'Resolved' | 'New' | 'Preparing' | 'Delivered'
+  | 'Urgent' | 'High' | 'Normal' | 'Low' | 'Connected' | 'Disconnected' | 'Syncing';
+
 interface StatusBadgeProps {
   status: StatusType | string;
 }
+
 export function StatusBadge({ status }: StatusBadgeProps) {
-  let colorClass = 'bg-gray-100 text-gray-700 border-gray-200';
+  let colorClass = 'bg-zinc-100 text-zinc-600 border-zinc-200';
+
   switch (status.toLowerCase()) {
     case 'confirmed':
     case 'available':
@@ -49,7 +34,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     case 'disconnected':
     case 'urgent':
     case 'dirty':
-      colorClass = 'bg-red-50 text-red-700 border-red-200';
+      colorClass = 'bg-rose-50 text-rose-700 border-rose-200';
       break;
     case 'checked-in':
     case 'occupied':
@@ -59,19 +44,20 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       break;
     case 'reserved':
     case 'high':
-      colorClass = 'bg-purple-50 text-purple-700 border-purple-200';
+      colorClass = 'bg-violet-50 text-violet-700 border-violet-200';
       break;
     case 'checked-out':
     case 'normal':
     case 'low':
-      colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
+      colorClass = 'bg-zinc-100 text-zinc-600 border-zinc-200';
       break;
   }
+
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-[0.03em] uppercase border shadow-[0_1px_0_rgba(255,255,255,0.35)_inset] ${colorClass}`}>
-      
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium tracking-[0.03em] uppercase border ${colorClass}`}
+    >
       {status}
-    </span>);
-
+    </span>
+  );
 }
