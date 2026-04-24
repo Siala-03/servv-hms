@@ -197,10 +197,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       const amount     = currFmt.format(Number(r.totalAmount));
 
       // Fetch hotel info for ticket
-      Promise.resolve(
-        supabase.from('rooms').select('hotel_id').eq('id', String(b.roomId ?? '')).maybeSingle()
-      ).then(async ({ data: roomRow }) => {
-        const hotelId = roomRow?.hotel_id ?? '';
+      Promise.resolve().then(async () => {
+        const hotelId = req.hotelId ?? '';
         const hotelQuery = hotelId
           ? supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
           : supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();
@@ -277,7 +275,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // PATCH /api/reservations/:id/status
-router.patch('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id/status', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { status } = req.body as { status: string };
     const { data, error } = await supabase
@@ -319,9 +317,8 @@ router.patch('/:id/status', async (req: Request, res: Response, next: NextFuncti
           const total = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
           const totalFmt = currFmt.format(total);
 
-          // Fetch hotel via room's hotel_id
-          const { data: roomRow } = await supabase.from('rooms').select('hotel_id').eq('id', String(r.roomId ?? '')).maybeSingle();
-          const hotelId = (roomRow as any)?.hotel_id ?? '';
+          // Resolve hotel details from authenticated hotel context when available.
+          const hotelId = req.hotelId ?? '';
           const { data: hotelRow } = hotelId
             ? await supabase.from('hotel_accounts').select('name,address,phone,email').eq('id', hotelId).single()
             : await supabase.from('hotel_accounts').select('name,address,phone,email').limit(1).single();

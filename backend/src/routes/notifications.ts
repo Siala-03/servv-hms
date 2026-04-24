@@ -38,7 +38,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const applyHotel = (query: any) => (hotelId ? query.eq('hotel_id', hotelId) : query);
 
     const [roomsResp, reservationsResp, tasksResp] = await Promise.all([
-      applyHotel(supabase.from('rooms').select('id')),
+      supabase.from('rooms').select('id'),
       applyHotel(
         supabase
           .from('reservations')

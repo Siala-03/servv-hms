@@ -4,13 +4,6 @@ import { AuthRequest } from '../middleware/authenticate';
 
 const router = Router();
 
-function resolveHotelId(req: AuthRequest, bodyHotelId?: unknown) {
-  const tokenHotelId = req.hotelId ?? null;
-  if (tokenHotelId) return tokenHotelId;
-  const explicitHotelId = String(bodyHotelId ?? '').trim();
-  return explicitHotelId || null;
-}
-
 function toRoom(row: Record<string, unknown>) {
   return {
     id:           row.id,
@@ -27,11 +20,6 @@ function toRoom(row: Record<string, unknown>) {
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const body = req.body as Record<string, unknown>;
-    const hotelId = resolveHotelId(req, body.hotelId);
-    if (!hotelId) {
-      res.status(400).json({ error: 'hotelId is required' });
-      return;
-    }
 
     if (!String(body.roomNumber ?? '').trim() || !String(body.roomType ?? '').trim()) {
       res.status(400).json({ error: 'roomNumber and roomType are required' });
@@ -41,7 +29,6 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const { data, error } = await supabase
       .from('rooms')
       .insert({
-        hotel_id:      hotelId,
         room_number:   body.roomNumber,
         room_type:     body.roomType,
         floor:         body.floor ?? 1,
@@ -63,11 +50,6 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 router.post('/bulk', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const body = req.body as Record<string, unknown>;
-    const hotelId = resolveHotelId(req, body.hotelId);
-    if (!hotelId) {
-      res.status(400).json({ error: 'hotelId is required' });
-      return;
-    }
 
     const floor = Number(body.floor ?? 1);
     const start = Number(body.startNumber);
@@ -93,7 +75,6 @@ router.post('/bulk', async (req: AuthRequest, res: Response, next: NextFunction)
     const roomRows = numbers.map((n) => {
       const num = padTo > 0 ? String(n).padStart(padTo, '0') : String(n);
       return {
-        hotel_id: hotelId,
         room_number: `${prefix}${num}`,
         room_type: roomType,
         floor,
@@ -128,8 +109,6 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       .order('floor')
       .order('room_number');
 
-    if (req.hotelId) query = query.eq('hotel_id', req.hotelId);
-
     const { data, error } = await query;
 
     if (error) throw new Error(error.message);
@@ -146,8 +125,6 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       .from('rooms')
       .select('*')
       .eq('id', req.params.id);
-
-    if (req.hotelId) query = query.eq('hotel_id', req.hotelId);
 
     const { data, error } = await query.single();
 
@@ -166,8 +143,6 @@ router.patch('/:id/status', async (req: AuthRequest, res: Response, next: NextFu
       .from('rooms')
       .update({ status })
       .eq('id', req.params.id);
-
-    if (req.hotelId) query = query.eq('hotel_id', req.hotelId);
 
     const { data, error } = await query.select().single();
 
@@ -194,8 +169,6 @@ router.put('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
       })
       .eq('id', req.params.id);
 
-    if (req.hotelId) query = query.eq('hotel_id', req.hotelId);
-
     const { data, error } = await query.select().single();
 
     if (error) { res.status(404).json({ error: 'Room not found' }); return; }
@@ -212,8 +185,6 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
       .from('rooms')
       .delete()
       .eq('id', req.params.id);
-
-    if (req.hotelId) query = query.eq('hotel_id', req.hotelId);
 
     const { error } = await query;
     if (error) throw new Error(error.message);
