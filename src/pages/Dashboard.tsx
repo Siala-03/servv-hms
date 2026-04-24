@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { BedDouble, Banknote, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight, Hotel, TimerReset, CalendarClock } from 'lucide-react';
+import { BedDouble, Banknote, TrendingUp, Bell, CalendarCheck, Plus, UserPlus, ArrowRight, Hotel, TimerReset, CalendarClock, ShieldAlert, ActivitySquare, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { PageHeader } from '../components/PageHeader';
 import { StatsCard } from '../components/StatsCard';
@@ -22,6 +22,19 @@ interface ApiRes {
 }
 interface ApiRoom { id: string; status: string; }
 interface ApiTask { id: string; status: string; notes?: string; room?: { roomNumber: string } | null; createdAt: string; }
+interface AnalyticsPayload {
+  pickup: { last1: number; last3: number; last7: number; previous7: number; paceChangePct: number };
+  cancellation: { last30Rate: number; upcomingAtRisk: number; upcomingTracked: number };
+  netRevenue: { grossRevenue: number; commissionCost: number; netRevenue: number; otaSharePct: number };
+  outOfOrder: {
+    roomCount: number;
+    estimatedDailyLoss: number;
+    estimated7dLoss: number;
+    avgUnavailableRate: number;
+    byType: Array<{ roomType: string; count: number; estimatedDailyLoss: number; estimated7dLoss: number }>;
+  };
+  channels: Array<{ channel: string; bookings: number; revenue: number; netRevenue: number; commissionRate: number; commissionCost: number; adr: number; netAdr: number; cancellationRate: number; efficiencyScore: number }>;
+}
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -47,6 +60,7 @@ export function Dashboard() {
   const [reservations, setReservations] = useState<ApiRes[]>([]);
   const [rooms,        setRooms]        = useState<ApiRoom[]>([]);
   const [tasks,        setTasks]        = useState<ApiTask[]>([]);
+  const [analytics,    setAnalytics]    = useState<AnalyticsPayload | null>(null);
   const [loading,      setLoading]      = useState(true);
 
   useEffect(() => {
@@ -54,10 +68,12 @@ export function Dashboard() {
       api.get<ApiRes[]>('/api/reservations'),
       api.get<ApiRoom[]>('/api/rooms'),
       api.get<ApiTask[]>('/api/housekeeping'),
-    ]).then(([r, rm, t]) => {
+      api.get<AnalyticsPayload>('/api/intelligence/analytics'),
+    ]).then(([r, rm, t, analyticsData]) => {
       setReservations(r);
       setRooms(rm);
       setTasks(t);
+      setAnalytics(analyticsData);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -113,6 +129,7 @@ export function Dashboard() {
     const percent = rooms.length ? Math.round((count / rooms.length) * 100) : 0;
     return { status, count, percent };
   });
+  const topChannel = analytics?.channels?.[0] ?? null;
 
   // 7-day occupancy chart
   const occupancyData = Array.from({ length: 7 }, (_, i) => {
@@ -240,6 +257,154 @@ export function Dashboard() {
           icon={CalendarClock}
           color="red"
         />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
+        <StatsCard
+          title="Pickup Pace (7d)"
+          value={loading ? '—' : `${analytics?.pickup.last7 ?? 0} bookings`}
+          icon={ActivitySquare}
+          color="emerald"
+          trend={loading ? undefined : analytics?.pickup.paceChangePct}
+          trendLabel="vs previous 7 days"
+        />
+        <StatsCard
+          title="Cancellation Risk"
+          value={loading ? '—' : `${analytics?.cancellation.last30Rate ?? 0}%`}
+          icon={ShieldAlert}
+          color="red"
+        />
+        <StatsCard
+          title="Net Revenue (30d)"
+          value={loading ? '—' : usd.format(analytics?.netRevenue.netRevenue ?? 0)}
+          icon={Banknote}
+          color="emerald"
+          trend={loading || !analytics?.netRevenue.grossRevenue ? undefined : Number((((analytics.netRevenue.netRevenue / analytics.netRevenue.grossRevenue) - 1) * 100).toFixed(1))}
+          trendLabel={loading ? undefined : `${usd.format(analytics?.netRevenue.commissionCost ?? 0)} commissions`}
+        />
+        <StatsCard
+          title="Out-of-Order Loss (7d)"
+          value={loading ? '—' : usd.format(analytics?.outOfOrder.estimated7dLoss ?? 0)}
+          icon={AlertTriangle}
+          color="red"
+          trend={loading ? undefined : -Math.max(0, analytics?.outOfOrder.roomCount ?? 0)}
+          trendLabel={loading ? undefined : `${analytics?.outOfOrder.roomCount ?? 0} room(s) unavailable`}
+        />
+        <StatsCard
+          title="Best Channel"
+          value={loading ? '—' : (topChannel?.channel ?? '—')}
+          icon={TrendingUp}
+          color="purple"
+          trend={loading || !topChannel ? undefined : topChannel.efficiencyScore - 50}
+          trendLabel={loading || !topChannel ? undefined : `ADR ${usd.format(topChannel.adr)}`}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">Booking Pace</h3>
+            <span className="text-xs uppercase tracking-wide text-slate-500">Recent pickup</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[
+              { label: '24h', value: analytics?.pickup.last1 ?? 0 },
+              { label: '3 days', value: analytics?.pickup.last3 ?? 0 },
+              { label: '7 days', value: analytics?.pickup.last7 ?? 0 },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
+                <p className="text-2xl font-semibold text-slate-900 mt-1">{loading ? '—' : item.value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-slate-600">
+            {loading
+              ? 'Loading booking pace…'
+              : `Pickup is ${analytics?.pickup.paceChangePct ?? 0}% ${Number(analytics?.pickup.paceChangePct ?? 0) >= 0 ? 'ahead of' : 'behind'} the previous 7-day window.`}
+          </p>
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">Net Revenue Snapshot</h3>
+            <span className="text-xs uppercase tracking-wide text-slate-500">Estimated after OTA commissions</span>
+          </div>
+          {loading || !analytics ? (
+            <p className="text-sm text-slate-400">Loading revenue analytics…</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Gross</p>
+                  <p className="text-xl font-semibold text-slate-900 mt-1">{usd.format(analytics.netRevenue.grossRevenue)}</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-red-600">Commission</p>
+                  <p className="text-xl font-semibold text-red-700 mt-1">{usd.format(analytics.netRevenue.commissionCost)}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-emerald-600">Net</p>
+                  <p className="text-xl font-semibold text-emerald-700 mt-1">{usd.format(analytics.netRevenue.netRevenue)}</p>
+                </div>
+              </div>
+              <div className="flex items-end justify-between mb-3">
+                <div>
+                  <p className="text-2xl font-semibold text-slate-900">{topChannel?.channel ?? '—'}</p>
+                  <p className="text-sm text-slate-500 mt-1">Top channel by current efficiency</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-semibold text-slate-900">{analytics.netRevenue.otaSharePct}%</p>
+                  <p className="text-xs text-slate-500">OTA revenue share</p>
+                </div>
+              </div>
+              {topChannel && (
+                <div className="space-y-2 text-sm text-slate-600">
+                  <div className="flex justify-between"><span>Gross Revenue</span><span className="font-medium text-slate-900">{usd.format(topChannel.revenue)}</span></div>
+                  <div className="flex justify-between"><span>Commission Cost</span><span className="font-medium text-slate-900">{usd.format(topChannel.commissionCost)}</span></div>
+                  <div className="flex justify-between"><span>Net ADR</span><span className="font-medium text-slate-900">{usd.format(topChannel.netAdr)}</span></div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">Out-of-Order Impact</h3>
+            <span className="text-xs uppercase tracking-wide text-slate-500">Lost inventory revenue</span>
+          </div>
+          {loading || !analytics ? (
+            <p className="text-sm text-slate-400">Loading out-of-order analytics…</p>
+          ) : analytics.outOfOrder.roomCount === 0 ? (
+            <p className="text-sm text-emerald-600 font-medium">No out-of-order rooms currently impacting revenue.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Rooms</p>
+                  <p className="text-xl font-semibold text-slate-900 mt-1">{analytics.outOfOrder.roomCount}</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-red-600">Daily Loss</p>
+                  <p className="text-xl font-semibold text-red-700 mt-1">{usd.format(analytics.outOfOrder.estimatedDailyLoss)}</p>
+                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-red-600">7d Loss</p>
+                  <p className="text-xl font-semibold text-red-700 mt-1">{usd.format(analytics.outOfOrder.estimated7dLoss)}</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm text-slate-600">
+                {analytics.outOfOrder.byType.slice(0, 3).map((item) => (
+                  <div key={item.roomType} className="flex justify-between">
+                    <span>{item.roomType} ({item.count})</span>
+                    <span className="font-medium text-slate-900">{usd.format(item.estimatedDailyLoss)}/day</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl mb-8">

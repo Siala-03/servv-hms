@@ -141,9 +141,28 @@ function addDays(base: Date, n: number) {
   return d;
 }
 
+function subtractDays(base: Date, n: number) {
+  return addDays(base, -n);
+}
+
 function isWeekend(iso: string) {
   const day = new Date(iso).getDay();
   return day === 5 || day === 6; // Fri / Sat
+}
+
+const CHANNEL_COMMISSION_RATES: Record<string, number> = {
+  'booking.com': 0.15,
+  airbnb: 0.03,
+  expedia: 0.18,
+  agoda: 0.15,
+  triply: 0.10,
+  direct: 0,
+  inquiry: 0,
+  hold: 0,
+};
+
+function getChannelCommissionRate(channel: string) {
+  return CHANNEL_COMMISSION_RATES[String(channel || '').trim().toLowerCase()] ?? 0;
 }
 
 type PricingSignal = 'surge' | 'high' | 'normal' | 'low' | 'discount';
@@ -238,6 +257,165 @@ function buildRulePricing(rooms: any[], upcoming: any[]): PricingRecommendation[
   });
 }
 
+// ── GET /api/intelligence/analytics ─────────────────────────────────────────
+// Shared analytics payload for dashboard + intelligence views.
+router.get('/analytics', async (req: AuthRequest, res, next) => {
+  try {
+    const hotelId = req.hotelId;
+    const today = new Date();
+    const last30 = subtractDays(today, 30).toISOString();
+    const last1 = subtractDays(today, 1).toISOString();
+    const last3 = subtractDays(today, 3).toISOString();
+    const last7 = subtractDays(today, 7).toISOString();
+    const last14 = subtractDays(today, 14).toISOString();
+    const in14Iso = isoDate(addDays(today, 14));
+
+    const ifHotelScoped = (query: any) => (hotelId ? query.eq('hotel_id', hotelId) : query);
+
+    const [recentReservationsResp, upcomingReservationsResp, roomsResp] = await Promise.all([
+      ifHotelScoped(
+        supabase
+          .from('reservations')
+          .select('id, channel, status, total_amount, created_at, check_in_date, check_out_date')
+          .gte('created_at', last30),
+      ),
+      ifHotelScoped(
+        supabase
+          .from('reservations')
+          .select('id, channel, status, total_amount, created_at, check_in_date, check_out_date')
+          .gte('check_in_date', isoDate(today))
+          .lte('check_in_date', in14Iso),
+      ),
+      supabase
+        .from('rooms')
+        .select('id, room_type, room_number, status, base_rate'),
+    ]);
+
+    const recentReservations = recentReservationsResp.data ?? [];
+    const upcomingReservations = upcomingReservationsResp.data ?? [];
+    const rooms = roomsResp.data ?? [];
+
+    const countCreatedSince = (iso: string) => recentReservations.filter((r: any) => String(r.created_at) >= iso).length;
+    const last1Count = countCreatedSince(last1);
+    const last3Count = countCreatedSince(last3);
+    const last7Count = countCreatedSince(last7);
+    const prev7Count = recentReservations.filter((r: any) => String(r.created_at) >= last14 && String(r.created_at) < last7).length;
+    const paceChangePct = prev7Count > 0 ? Math.round(((last7Count - prev7Count) / prev7Count) * 100) : (last7Count > 0 ? 100 : 0);
+
+    const last30Reservations = recentReservations;
+    const cancelledLast30 = last30Reservations.filter((r: any) => String(r.status) === 'Cancelled').length;
+    const cancellationRate = last30Reservations.length ? Math.round((cancelledLast30 / last30Reservations.length) * 100) : 0;
+    const revenueReservations = last30Reservations.filter((r: any) => String(r.status) !== 'Cancelled');
+
+    const upcomingConfirmed = upcomingReservations.filter((r: any) => ['Confirmed', 'Pending'].includes(String(r.status)));
+    const upcomingRiskCount = Math.round(upcomingConfirmed.length * (cancellationRate / 100));
+
+    const channelMap = new Map<string, { channel: string; bookings: number; revenue: number; cancelled: number; commissionCost: number; netRevenue: number }>();
+    for (const reservation of last30Reservations as any[]) {
+      const channel = String(reservation.channel || 'Direct');
+      const current = channelMap.get(channel) ?? { channel, bookings: 0, revenue: 0, cancelled: 0, commissionCost: 0, netRevenue: 0 };
+      const gross = Number(reservation.total_amount ?? 0);
+      const commissionRate = getChannelCommissionRate(channel);
+      const commissionCost = String(reservation.status) === 'Cancelled' ? 0 : gross * commissionRate;
+      current.bookings += 1;
+      current.revenue += gross;
+      current.commissionCost += commissionCost;
+      current.netRevenue += gross - commissionCost;
+      if (String(reservation.status) === 'Cancelled') current.cancelled += 1;
+      channelMap.set(channel, current);
+    }
+
+    const grossRevenue = revenueReservations.reduce((sum: number, reservation: any) => sum + Number(reservation.total_amount ?? 0), 0);
+    const commissionCost = revenueReservations.reduce((sum: number, reservation: any) => {
+      return sum + Number(reservation.total_amount ?? 0) * getChannelCommissionRate(String(reservation.channel || 'Direct'));
+    }, 0);
+    const netRevenue = grossRevenue - commissionCost;
+    const otaRevenue = revenueReservations.reduce((sum: number, reservation: any) => {
+      const rate = getChannelCommissionRate(String(reservation.channel || 'Direct'));
+      return sum + (rate > 0 ? Number(reservation.total_amount ?? 0) : 0);
+    }, 0);
+    const otaSharePct = grossRevenue > 0 ? Math.round((otaRevenue / grossRevenue) * 100) : 0;
+
+    const globalAdr = revenueReservations.length ? grossRevenue / revenueReservations.length : 0;
+    const outOfOrderRooms = rooms.filter((room: any) => {
+      const status = String(room.status ?? '').toLowerCase();
+      return status === 'maintenance' || status === 'out of order' || status === 'out_of_order';
+    });
+    const outOfOrderByTypeMap = new Map<string, { roomType: string; count: number; dailyLoss: number }>();
+    for (const room of outOfOrderRooms as any[]) {
+      const roomType = String(room.room_type || 'Unknown');
+      const rate = Number(room.base_rate ?? 0) > 0 ? Number(room.base_rate) : globalAdr;
+      const current = outOfOrderByTypeMap.get(roomType) ?? { roomType, count: 0, dailyLoss: 0 };
+      current.count += 1;
+      current.dailyLoss += rate;
+      outOfOrderByTypeMap.set(roomType, current);
+    }
+    const outOfOrderByType = Array.from(outOfOrderByTypeMap.values())
+      .map((item) => ({
+        roomType: item.roomType,
+        count: item.count,
+        estimatedDailyLoss: Math.round(item.dailyLoss),
+        estimated7dLoss: Math.round(item.dailyLoss * 7),
+      }))
+      .sort((a, b) => b.estimatedDailyLoss - a.estimatedDailyLoss);
+    const outOfOrderDailyLoss = outOfOrderByType.reduce((sum, item) => sum + item.estimatedDailyLoss, 0);
+
+    const channelEfficiency = Array.from(channelMap.values())
+      .map((item) => {
+        const adr = item.bookings ? Math.round(item.revenue / item.bookings) : 0;
+        const netAdr = item.bookings ? Math.round(item.netRevenue / item.bookings) : 0;
+        const cancelRate = item.bookings ? Math.round((item.cancelled / item.bookings) * 100) : 0;
+        const commissionRate = getChannelCommissionRate(item.channel);
+        const efficiencyScore = Math.max(0, Math.min(100, Math.round((netAdr / Math.max(1, netAdr + 80)) * 65 + (100 - cancelRate) * 0.35 - commissionRate * 20)));
+        return {
+          channel: item.channel,
+          bookings: item.bookings,
+          revenue: item.revenue,
+          netRevenue: item.netRevenue,
+          commissionRate: Math.round(commissionRate * 100),
+          commissionCost: item.commissionCost,
+          adr,
+          netAdr,
+          cancellationRate: cancelRate,
+          efficiencyScore,
+        };
+      })
+      .sort((a, b) => b.efficiencyScore - a.efficiencyScore || b.revenue - a.revenue);
+
+    res.json({
+      pickup: {
+        last1: last1Count,
+        last3: last3Count,
+        last7: last7Count,
+        previous7: prev7Count,
+        paceChangePct,
+      },
+      cancellation: {
+        last30Rate: cancellationRate,
+        upcomingAtRisk: upcomingRiskCount,
+        upcomingTracked: upcomingConfirmed.length,
+      },
+      netRevenue: {
+        grossRevenue,
+        commissionCost,
+        netRevenue,
+        otaSharePct,
+      },
+      outOfOrder: {
+        roomCount: outOfOrderRooms.length,
+        estimatedDailyLoss: Math.round(outOfOrderDailyLoss),
+        estimated7dLoss: Math.round(outOfOrderDailyLoss * 7),
+        avgUnavailableRate: outOfOrderRooms.length ? Math.round(outOfOrderDailyLoss / outOfOrderRooms.length) : 0,
+        byType: outOfOrderByType,
+      },
+      channels: channelEfficiency,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── GET /api/intelligence/forecast ───────────────────────────────────────────
 // Returns 30-day occupancy forecast from confirmed/pending/checked-in bookings.
 router.get('/forecast', async (req: AuthRequest, res, next) => {
@@ -247,8 +425,7 @@ router.get('/forecast', async (req: AuthRequest, res, next) => {
     const end     = addDays(today, 30);
 
     // All rooms
-    let roomsQ = supabase.from('rooms').select('id', { count: 'exact', head: true });
-    if (hotelId) roomsQ = roomsQ.eq('hotel_id', hotelId);
+    const roomsQ = supabase.from('rooms').select('id', { count: 'exact', head: true });
     const { count: totalRooms } = await roomsQ;
     const rooms = totalRooms ?? 1;
 
@@ -291,8 +468,7 @@ router.get('/pricing', async (req: AuthRequest, res, next) => {
     const todayIso = isoDate(today);
 
     // All rooms
-    let roomsQ = supabase.from('rooms').select('id, room_type, base_rate, hotel_id');
-    if (hotelId) roomsQ = roomsQ.eq('hotel_id', hotelId);
+    const roomsQ = supabase.from('rooms').select('id, room_type, base_rate, status');
     const { data: rooms } = await roomsQ;
 
     // Reservations overlapping next 7 days
@@ -436,8 +612,7 @@ router.post('/insights', async (req: AuthRequest, res, next) => {
     if (hotelId) upcomingQ = upcomingQ.eq('hotel_id', hotelId);
     const upcoming: any[] = await buildQ('reservations', upcomingQ);
 
-    let roomsQ = supabase.from('rooms').select('id, status, room_type');
-    if (hotelId) roomsQ = roomsQ.eq('hotel_id', hotelId);
+    const roomsQ = supabase.from('rooms').select('id, status, room_type');
     const allRooms: any[] = await buildQ('rooms', roomsQ);
 
     let tasksQ = supabase.from('housekeeping_tasks').select('status').eq('status', 'Open');
@@ -548,7 +723,7 @@ router.post('/chat', async (req: AuthRequest, res, next) => {
 
     const [{ data: rooms }, { data: recentRes }, { data: upcomingRes }, { data: openTasks }, { data: staff }] =
       await Promise.all([
-        ifHotel(supabase.from('rooms').select('id, room_type, base_rate, status')),
+        supabase.from('rooms').select('id, room_type, base_rate, status'),
         ifHotel(supabase.from('reservations')
           .select('status, channel, total_amount, check_in_date, check_out_date')
           .gte('created_at', ago7.toISOString())

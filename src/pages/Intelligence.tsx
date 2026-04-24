@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Brain, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2,
-  Zap, BarChart3, Banknote, AlertTriangle, Lightbulb, CheckCircle2, Sparkles,
+  Zap, BarChart3, Banknote, AlertTriangle, Lightbulb, CheckCircle2, Sparkles, ActivitySquare, ShieldAlert,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -36,6 +36,21 @@ interface AiResponse {
   insights: AiInsight[];
   summary:  string;
   kpis:     Record<string, string | number>;
+  generatedAt: string;
+}
+
+interface AnalyticsResponse {
+  pickup: { last1: number; last3: number; last7: number; previous7: number; paceChangePct: number };
+  cancellation: { last30Rate: number; upcomingAtRisk: number; upcomingTracked: number };
+  netRevenue: { grossRevenue: number; commissionCost: number; netRevenue: number; otaSharePct: number };
+  outOfOrder: {
+    roomCount: number;
+    estimatedDailyLoss: number;
+    estimated7dLoss: number;
+    avgUnavailableRate: number;
+    byType: Array<{ roomType: string; count: number; estimatedDailyLoss: number; estimated7dLoss: number }>;
+  };
+  channels: Array<{ channel: string; bookings: number; revenue: number; netRevenue: number; commissionRate: number; commissionCost: number; adr: number; netAdr: number; cancellationRate: number; efficiencyScore: number }>;
   generatedAt: string;
 }
 
@@ -73,6 +88,7 @@ export function Intelligence() {
   const [forecast,    setForecast]    = useState<ForecastDay[]>([]);
   const [pricing,     setPricing]     = useState<PricingRec[]>([]);
   const [ai,          setAi]          = useState<AiResponse | null>(null);
+  const [analytics,   setAnalytics]   = useState<AnalyticsResponse | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [loadingAi,   setLoadingAi]   = useState(false);
   const [aiError,     setAiError]     = useState('');
@@ -80,12 +96,14 @@ export function Intelligence() {
   async function loadData() {
     setLoadingData(true);
     try {
-      const [fc, pr] = await Promise.all([
+      const [fc, pr, analyticsData] = await Promise.all([
         api.get<ForecastDay[]>('/api/intelligence/forecast'),
         api.get<PricingRec[]>('/api/intelligence/pricing'),
+        api.get<AnalyticsResponse>('/api/intelligence/analytics'),
       ]);
       setForecast(fc);
       setPricing(pr);
+      setAnalytics(analyticsData);
     } catch { /* non-fatal */ } finally { setLoadingData(false); }
   }
 
@@ -110,6 +128,7 @@ export function Intelligence() {
     : 0;
   const surgeRecs    = pricing.filter((p) => p.signal === 'surge' || p.signal === 'high').length;
   const pricingSource = pricing[0]?.source === 'ai' ? 'ai' : 'rules';
+  const topChannel = analytics?.channels?.[0];
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -155,6 +174,87 @@ export function Intelligence() {
         </div>
       </section>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-6">
+        <div className="luxury-panel luxury-panel-spotlight p-5 rounded-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+              <ActivitySquare className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Pickup Pace</p>
+              <p className="text-xs text-slate-400">Recent booking velocity</p>
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-slate-900">{loadingData ? '—' : analytics?.pickup.last7 ?? 0}</p>
+          <p className="text-sm text-slate-500 mt-1">Bookings in the last 7 days</p>
+          <p className={`text-xs mt-3 font-medium ${(analytics?.pickup.paceChangePct ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            {loadingData ? '—' : `${analytics?.pickup.paceChangePct ?? 0}% vs previous 7 days`}
+          </p>
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-5 rounded-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
+              <ShieldAlert className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Cancellation Risk</p>
+              <p className="text-xs text-slate-400">Historical and upcoming risk</p>
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-slate-900">{loadingData ? '—' : `${analytics?.cancellation.last30Rate ?? 0}%`}</p>
+          <p className="text-sm text-slate-500 mt-1">Last 30-day cancel rate</p>
+          <p className="text-xs mt-3 text-slate-600">
+            {loadingData ? '—' : `${analytics?.cancellation.upcomingAtRisk ?? 0} of ${analytics?.cancellation.upcomingTracked ?? 0} upcoming stays flagged at risk`}
+          </p>
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-5 rounded-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center">
+              <Banknote className="w-4 h-4 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Best Channel</p>
+              <p className="text-xs text-slate-400">Current efficiency leader</p>
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-slate-900">{loadingData ? '—' : (topChannel?.channel ?? '—')}</p>
+          <p className="text-sm text-slate-500 mt-1">ADR {loadingData || !topChannel ? '—' : usd.format(topChannel.adr)}</p>
+          <p className="text-xs mt-3 text-slate-600">{loadingData || !topChannel ? '—' : `Efficiency score ${topChannel.efficiencyScore}/100`}</p>
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-5 rounded-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+              <Banknote className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Net Revenue</p>
+              <p className="text-xs text-slate-400">After OTA commissions</p>
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-slate-900">{loadingData ? '—' : usd.format(analytics?.netRevenue.netRevenue ?? 0)}</p>
+          <p className="text-sm text-slate-500 mt-1">Gross {loadingData ? '—' : usd.format(analytics?.netRevenue.grossRevenue ?? 0)}</p>
+          <p className="text-xs mt-3 text-slate-600">{loadingData ? '—' : `${usd.format(analytics?.netRevenue.commissionCost ?? 0)} in estimated commissions`}</p>
+        </div>
+
+        <div className="luxury-panel luxury-panel-spotlight p-5 rounded-2xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Out-of-Order Loss</p>
+              <p className="text-xs text-slate-400">Unavailable room inventory</p>
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-slate-900">{loadingData ? '—' : usd.format(analytics?.outOfOrder.estimated7dLoss ?? 0)}</p>
+          <p className="text-sm text-slate-500 mt-1">Estimated 7-day revenue loss</p>
+          <p className="text-xs mt-3 text-slate-600">{loadingData ? '—' : `${analytics?.outOfOrder.roomCount ?? 0} room(s) out-of-order · ${usd.format(analytics?.outOfOrder.estimatedDailyLoss ?? 0)}/day`}</p>
+        </div>
+      </div>
+
       {/* ── 30-day forecast chart ──────────────────────────────── */}
       <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl mb-6">
         <div className="flex items-center justify-between mb-6">
@@ -195,6 +295,125 @@ export function Intelligence() {
             <span>Peak: <strong className="text-slate-800">{fmtDay(peakDay.date)} at {peakDay.occupancyRate}%</strong></span>
             <span>Weekend avg: <strong className="text-slate-800">{weekendAvg}%</strong></span>
             <span>Red line = 80% threshold (recommended rate increase trigger)</span>
+          </div>
+        )}
+      </div>
+
+      <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Out-of-Order Revenue Impact</h3>
+            <p className="text-sm text-slate-400 mt-0.5">Estimated daily and weekly revenue loss from unavailable rooms</p>
+          </div>
+        </div>
+        {loadingData ? (
+          <div className="text-sm text-slate-400">Loading out-of-order analytics…</div>
+        ) : !analytics ? (
+          <div className="text-sm text-slate-400">No analytics data available.</div>
+        ) : analytics.outOfOrder.roomCount === 0 ? (
+          <div className="text-sm text-emerald-600 font-medium">No out-of-order rooms currently affecting inventory.</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-red-600">Estimated Daily Loss</p>
+                <p className="text-2xl font-semibold text-red-700 mt-1">{usd.format(analytics.outOfOrder.estimatedDailyLoss)}</p>
+              </div>
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-red-600">Estimated 7-Day Loss</p>
+                <p className="text-2xl font-semibold text-red-700 mt-1">{usd.format(analytics.outOfOrder.estimated7dLoss)}</p>
+              </div>
+              <p className="text-sm text-slate-600">Average unavailable room rate: <span className="font-medium text-slate-900">{usd.format(analytics.outOfOrder.avgUnavailableRate)}</span></p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-900 mb-3">Loss by Room Type</p>
+              <div className="space-y-2">
+                {analytics.outOfOrder.byType.map((row) => (
+                  <div key={row.roomType} className="rounded-lg border border-slate-200 px-3 py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{row.roomType}</p>
+                      <p className="text-xs text-slate-500">{row.count} room(s)</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-slate-900">{usd.format(row.estimatedDailyLoss)}/day</p>
+                      <p className="text-xs text-slate-500">{usd.format(row.estimated7dLoss)} / 7d</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="luxury-panel luxury-panel-spotlight p-6 rounded-2xl mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Gross Revenue</p>
+            <p className="text-xl font-semibold text-slate-900 mt-1">{loadingData ? '—' : usd.format(analytics?.netRevenue.grossRevenue ?? 0)}</p>
+          </div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-red-600">Commission Cost</p>
+            <p className="text-xl font-semibold text-red-700 mt-1">{loadingData ? '—' : usd.format(analytics?.netRevenue.commissionCost ?? 0)}</p>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-emerald-600">Net Revenue</p>
+            <p className="text-xl font-semibold text-emerald-700 mt-1">{loadingData ? '—' : usd.format(analytics?.netRevenue.netRevenue ?? 0)}</p>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-amber-600">OTA Share</p>
+            <p className="text-xl font-semibold text-amber-700 mt-1">{loadingData ? '—' : `${analytics?.netRevenue.otaSharePct ?? 0}%`}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Channel Efficiency</h3>
+            <p className="text-sm text-slate-400 mt-0.5">Compare gross, commission drag, net ADR, and channel quality</p>
+          </div>
+        </div>
+        {loadingData ? (
+          <div className="text-sm text-slate-400">Loading channel analytics…</div>
+        ) : !analytics?.channels?.length ? (
+          <div className="text-sm text-slate-400">No channel data available yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-100">
+                  <th className="py-3 pr-4 font-medium">Channel</th>
+                  <th className="py-3 pr-4 font-medium">Bookings</th>
+                  <th className="py-3 pr-4 font-medium">Gross</th>
+                  <th className="py-3 pr-4 font-medium">Comm.</th>
+                  <th className="py-3 pr-4 font-medium">Net</th>
+                  <th className="py-3 pr-4 font-medium">ADR</th>
+                  <th className="py-3 pr-4 font-medium">Net ADR</th>
+                  <th className="py-3 pr-4 font-medium">Cancel %</th>
+                  <th className="py-3 font-medium">Efficiency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.channels.map((channel) => (
+                  <tr key={channel.channel} className="border-b border-slate-100 last:border-0">
+                    <td className="py-3 pr-4 font-medium text-slate-900">{channel.channel}</td>
+                    <td className="py-3 pr-4 text-slate-600">{channel.bookings}</td>
+                    <td className="py-3 pr-4 text-slate-600">{usd.format(channel.revenue)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{usd.format(channel.commissionCost)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{usd.format(channel.netRevenue)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{usd.format(channel.adr)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{usd.format(channel.netAdr)}</td>
+                    <td className="py-3 pr-4 text-slate-600">{channel.cancellationRate}%</td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-24 h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${channel.efficiencyScore}%` }} />
+                        </div>
+                        <span className="text-slate-900 font-medium">{channel.efficiencyScore}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
