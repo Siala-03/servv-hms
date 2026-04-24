@@ -160,13 +160,26 @@ router.get('/book/:hotelId/availability', async (req, res) => {
     return res.status(404).json({ error: 'Hotel not found' });
   }
 
-  // All rooms for hotel
-  const { data: rooms } = await supabase
+  // Rooms are not hotel-scoped in some schemas. Derive known room IDs from hotel reservations when possible.
+  const { data: roomRefs } = await supabase
+    .from('reservations')
+    .select('room_id')
+    .eq('hotel_id', hotelId)
+    .not('room_id', 'is', null);
+
+  const knownRoomIds = Array.from(new Set((roomRefs ?? []).map((r: any) => r.room_id).filter(Boolean)));
+
+  let roomsQuery = supabase
     .from('rooms')
     .select('id, room_number, room_type, floor, base_rate, max_occupancy, status')
-    .eq('hotel_id', hotelId)
     .order('floor')
     .order('room_number');
+
+  if (knownRoomIds.length > 0) {
+    roomsQuery = roomsQuery.in('id', knownRoomIds);
+  }
+
+  const { data: rooms } = await roomsQuery;
 
   // Find rooms already booked in this range
   const { data: conflicting } = await supabase
@@ -290,18 +303,17 @@ router.post('/book/:hotelId', async (req, res) => {
   Promise.resolve(
     supabase
       .from('rooms')
-      .select('room_number, room_type, floor, hotel_id, rate_plans(name, meal_plan)')
+      .select('room_number, room_type, floor, rate_plans(name, meal_plan)')
       .eq('id', roomId)
       .single()
   ).then(async ({ data: roomRow }) => {
     const rm  = roomRow as Record<string, unknown> | null;
     const rp  = rm ? (rm as any).rate_plans : null;
-    const hId = rm ? String((rm as any).hotel_id ?? '') : hotelId;
 
     const { data: hotelRow } = await supabase
       .from('hotel_accounts')
       .select('name,address,phone,email')
-      .eq('id', hId)
+      .eq('id', hotelId)
       .single();
     const h = hotelRow as Record<string, unknown> | null;
 
@@ -342,17 +354,25 @@ router.post('/book/:hotelId', async (req, res) => {
 router.get('/room/:roomId', async (req, res) => {
   const { data: room, error } = await supabase
     .from('rooms')
-    .select('id, room_number, room_type, floor, hotel_id')
+    .select('id, room_number, room_type, floor')
     .eq('id', req.params.roomId)
     .maybeSingle();
 
   if (error || !room) return res.status(404).json({ error: 'Room not found' });
 
-  const { data: hotel } = await supabase
-    .from('hotel_accounts')
-    .select('id, name, phone, email, address')
-    .eq('id', room.hotel_id)
+  const { data: recentReservation } = await supabase
+    .from('reservations')
+    .select('hotel_id')
+    .eq('room_id', room.id)
+    .not('hotel_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
+
+  const hotelId = (recentReservation as any)?.hotel_id ?? null;
+  const { data: hotel } = hotelId
+    ? await supabase.from('hotel_accounts').select('id, name, phone, email, address').eq('id', hotelId).maybeSingle()
+    : await supabase.from('hotel_accounts').select('id, name, phone, email, address').limit(1).maybeSingle();
 
   res.json({
     room: {
@@ -382,7 +402,7 @@ router.post('/room/:roomId/order', async (req, res) => {
 
   const { data: room } = await supabase
     .from('rooms')
-    .select('id, room_number, hotel_id')
+    .select('id, room_number')
     .eq('id', req.params.roomId)
     .maybeSingle();
 
@@ -391,12 +411,14 @@ router.post('/room/:roomId/order', async (req, res) => {
   // Find active reservation for this room (if any) to link the order
   const { data: reservation } = await supabase
     .from('reservations')
-    .select('id, guest_id')
+    .select('id, guest_id, hotel_id')
     .eq('room_id', room.id)
     .in('status', ['Checked-in', 'Confirmed'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  const resolvedHotelId = (reservation as any)?.hotel_id ?? null;
 
   const allItems = notes ? [...items, `Note: ${notes}`] : items;
 
@@ -418,7 +440,9 @@ router.post('/room/:roomId/order', async (req, res) => {
 
   // Alert hotel front desk via WhatsApp
   Promise.resolve(
-    supabase.from('hotel_accounts').select('phone').eq('id', room.hotel_id).single()
+    resolvedHotelId
+      ? supabase.from('hotel_accounts').select('phone').eq('id', resolvedHotelId).single()
+      : supabase.from('hotel_accounts').select('phone').limit(1).single()
   ).then(({ data: h }) => {
     const hotelPhone = String((h as Record<string, unknown> | null)?.phone ?? '');
     if (hotelPhone.length > 5) {
@@ -442,11 +466,21 @@ router.post('/room/:roomId/request', async (req, res) => {
 
   const { data: room } = await supabase
     .from('rooms')
-    .select('id, room_number, hotel_id')
+    .select('id, room_number')
     .eq('id', req.params.roomId)
     .maybeSingle();
 
   if (!room) return res.status(404).json({ error: 'Room not found' });
+
+  const { data: recentReservation } = await supabase
+    .from('reservations')
+    .select('hotel_id')
+    .eq('room_id', room.id)
+    .not('hotel_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const resolvedHotelId = (recentReservation as any)?.hotel_id ?? null;
 
   const priority = type === 'Maintenance' ? 'High' : 'Normal';
   const taskNotes = [type, notes].filter(Boolean).join(' — ');
@@ -455,7 +489,7 @@ router.post('/room/:roomId/request', async (req, res) => {
     .from('housekeeping_tasks')
     .insert({
       room_id:  room.id,
-      hotel_id: room.hotel_id,
+      hotel_id: resolvedHotelId,
       status:   'Open',
       priority,
       notes:    `[QR Guest Request] ${taskNotes}`,
@@ -467,7 +501,9 @@ router.post('/room/:roomId/request', async (req, res) => {
 
   // Alert hotel front desk via WhatsApp
   Promise.resolve(
-    supabase.from('hotel_accounts').select('phone').eq('id', room.hotel_id).single()
+    resolvedHotelId
+      ? supabase.from('hotel_accounts').select('phone').eq('id', resolvedHotelId).single()
+      : supabase.from('hotel_accounts').select('phone').limit(1).single()
   ).then(({ data: h }) => {
     const hotelPhone = String((h as Record<string, unknown> | null)?.phone ?? '');
     if (hotelPhone.length > 5) {
